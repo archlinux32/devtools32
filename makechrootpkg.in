@@ -256,7 +256,7 @@ cat >"$copydir/chrootbuild" <<EOF
 export HOME=/build
 
 cd /build
-sudo -u nobody makepkg $makepkg_args || touch BUILD_FAILED
+sudo -u nobody ${MAKEPKG:-makepkg} $makepkg_args || touch BUILD_FAILED
 
 [[ -f BUILD_FAILED ]] && exit 1
 
