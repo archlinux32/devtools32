@@ -183,17 +183,7 @@ trap_chroot_umount () {
 }
 
 chroot_lock () {
-	# Only reopen the FD if it wasn't handed to us
-	if [[ $(readlink -f /dev/fd/9) != "${working_dir}.lock" ]]; then
-	  exec 9>"${working_dir}.lock"
-	fi
-
-	# Lock the chroot. Take note of the FD number.
-	if ! flock -n 9; then
-		stat_busy "Locking chroot"
-		flock 9
-		stat_done
-	fi
+	lock_open_write 9 "${working_dir}.lock" "Locking chroot"u
 }
 
 chroot_run() {

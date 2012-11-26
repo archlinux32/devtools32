@@ -114,23 +114,12 @@ umask 0022
 
 # Lock the chroot we want to use. We'll keep this lock until we exit.
 # Note this is the same FD number as in mkarchroot
-exec 9>"$copydir.lock"
-if ! flock -n 9; then
-	stat_busy "Locking chroot copy '$copy'"
-	flock 9
-	stat_done
-fi
+lock_open_write 9 "$copydir.lock" "Locking chroot copy '$copy'"
 
 if [[ ! -d $copydir ]] || $clean_first; then
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
-	exec 8>"$chrootdir/root.lock"
-
-	if ! flock -sn 8; then
-		stat_busy "Locking clean chroot"
-		flock -s 8
-		stat_done
-	fi
+	lock_open_read 8 "$chrootdir/root.lock" "Locking clean chroot"
 
 	stat_busy 'Creating clean working copy'
 	use_rsync=false
@@ -149,7 +138,7 @@ if [[ ! -d $copydir ]] || $clean_first; then
 	stat_done
 
 	# Drop the read lock again
-	exec 8>&-
+	lock_close 8
 fi
 
 if [[ -n $install_pkg ]]; then

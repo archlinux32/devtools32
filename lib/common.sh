@@ -104,6 +104,55 @@ in_array() {
 }
 
 ##
+#  usage : lock_open_write( $fd, $path, $wait_message )
+##
+lock_open_write() {
+	local fd=$1
+	local path=$2
+	local msg=$3
+
+	# Only reopen the FD if it wasn't handed to us
+	if [[ $(readlink -f /dev/fd/$fd) != "${path}.lock" ]]; then
+		eval "exec $fd>${path}.lock"
+	fi
+
+	if ! flock -n $fd; then
+		stat_busy "$msg"
+		flock $fd
+		stat_done
+	fi
+}
+
+##
+#  usage : lock_open_read( $fd, $path, $wait_message )
+##
+lock_open_read() {
+	local fd=$1
+	local path=$2
+	local msg=$3
+
+	# Only reopen the FD if it wasn't handed to us
+	if [[ $(readlink -f /dev/fd/$fd) != "${path}.lock" ]]; then
+		eval "exec $fd>${path}.lock"
+	fi
+
+	if ! flock -sn $fd; then
+		stat_busy "$msg"
+		flock -s $fd
+		stat_done
+	fi
+}
+
+
+##
+#  usage : lock_close( $fd )
+##
+lock_close() {
+	local fd=$1
+	eval "exec $fd>&-"
+}
+
+##
 #  usage : get_full_version( [$pkgname] )
 # return : full version spec, including epoch (if necessary), pkgver, pkgrel
 ##
