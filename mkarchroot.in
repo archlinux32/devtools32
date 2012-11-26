@@ -15,6 +15,7 @@ CHROOT_VERSION='v2'
 FORCE='n'
 RUN=''
 NOCOPY='n'
+NONETWORK='n'
 
 working_dir=''
 
@@ -31,6 +32,7 @@ usage() {
 	echo '    -M <file>     Location of a makepkg config file'
 	echo '    -n            Do not copy config files into the chroot'
 	echo '    -c <dir>      Set pacman cache'
+	echo '    -N            Disable networking in the chroot'
 	echo '    -h            This message'
 	exit 1
 }
@@ -44,6 +46,7 @@ while getopts 'r:ufnhC:M:c:' arg; do
 		M) makepkg_conf="$OPTARG" ;;
 		n) NOCOPY='y' ;;
 		c) cache_dir="$OPTARG" ;;
+		N) NONETWORK='y' ;;
 		h|?) usage 0 ;;
 		*) error "invalid argument '${arg}'"; usage ;;
 	esac
@@ -190,9 +193,17 @@ chroot_run() {
 	local dir=$1
 	shift
 	if (( have_nspawn)); then
-		eval systemd-nspawn -D "${dir}" -- ${@} 2>/dev/null
+		local nspawn_args=(-D "$dir")
+		if [[ $NONETWORK = y ]]; then
+			nspawn_args+=(--private-network)
+		fi
+		eval systemd-nspawn "${nspawn_args[@]}" -- "${@}" 2>/dev/null
 	else
-		eval unshare -mui -- chroot "${dir}" ${@}
+		local unshare_args=(-mui)
+		if [[ $NONETWORK = y ]]; then
+			unshare_args+=(-n)
+		fi
+		eval unshare "${unshare_args[@]}" -- chroot "${dir}" "${@}"
 	fi
 }
 
