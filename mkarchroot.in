@@ -23,7 +23,7 @@ APPNAME=$(basename "${0}")
 
 # usage: usage <exitvalue>
 usage() {
-	echo "usage ${APPNAME} [options] working-dir [package-list | app]"
+	echo "Usage: ${APPNAME} [options] working-dir [package-list | app]"
 	echo ' options:'
 	echo '    -r <app>      Run "app" within the context of the chroot'
 	echo '    -u            Update the chroot via pacman'
@@ -47,7 +47,7 @@ while getopts 'r:ufnhC:M:c:' arg; do
 		n) NOCOPY='y' ;;
 		c) cache_dir="$OPTARG" ;;
 		N) NONETWORK='y' ;;
-		h|?) usage 0 ;;
+		h|?) usage ;;
 		*) error "invalid argument '${arg}'"; usage ;;
 	esac
 done
