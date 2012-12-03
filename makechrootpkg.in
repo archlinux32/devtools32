@@ -119,7 +119,7 @@ lock_open_write 9 "$copydir.lock" "Locking chroot copy '$copy'"
 if [[ ! -d $copydir ]] || $clean_first; then
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
-	lock_open_read 8 "$chrootdir/root.lock" "Locking clean chroot"
+	lock_open_read 8 "$chrootdir/root" "Locking clean chroot"
 
 	stat_busy 'Creating clean working copy'
 	use_rsync=false
