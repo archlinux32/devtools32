@@ -186,7 +186,7 @@ trap_chroot_umount () {
 }
 
 chroot_lock () {
-	lock_open_write 9 "${working_dir}.lock" "Locking chroot"u
+	lock_open_write 9 "${working_dir}" "Locking chroot"
 }
 
 chroot_run() {
