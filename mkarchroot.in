@@ -23,51 +23,86 @@ APPNAME=$(basename "${0}")
 
 # usage: usage <exitvalue>
 usage() {
-	echo "Usage: ${APPNAME} [options] working-dir [package-list | app]"
+	echo "Usage: ${APPNAME} [options] working-dir [action]"
 	echo ' options:'
-	echo '    -r <app>      Run "app" within the context of the chroot'
-	echo '    -u            Update the chroot via pacman'
 	echo '    -f            Force overwrite of files in the working-dir'
 	echo '    -C <file>     Location of a pacman config file'
 	echo '    -M <file>     Location of a makepkg config file'
 	echo '    -n            Do not copy config files into the chroot'
 	echo '    -c <dir>      Set pacman cache'
 	echo '    -N            Disable networking in the chroot'
-	echo '    -h            This message'
-	exit 1
+	echo ' actions:'
+	echo '    -i <pkg-list> Install "pkg-list" in the chroot.'
+	echo '                  Creates the chroot if necessary, workding-dir must exist'
+	echo '    -r <cmd>      Run "cmd" within the context of the chroot'
+	echo '    -u            Update the chroot via pacman'
+	echo '    -h            Print this message'
+
+	exit ${1-1}
 }
 
-while getopts 'r:ufnhC:M:c:' arg; do
+################################################################################
+
+while getopts 'fC:M:nc:Nr:uh' arg; do
 	case "${arg}" in
-		r) RUN="$OPTARG" ;;
-		u) RUN='/bin/sh -c "pacman -Syu --noconfirm && (pacman -Qqu >/dev/null && pacman -Su --noconfirm || exit 0)"' ;;
 		f) FORCE='y' ;;
 		C) pac_conf="$OPTARG" ;;
 		M) makepkg_conf="$OPTARG" ;;
 		n) NOCOPY='y' ;;
 		c) cache_dir="$OPTARG" ;;
 		N) NONETWORK='y' ;;
-		h|?) usage ;;
+
+		r) action="-$arg"; action_arg="$OPTARG" ;;
+		u|h) action="-$arg" ;;
+
 		*) error "invalid argument '${arg}'"; usage ;;
 	esac
 done
 
+shift $(($OPTIND - 1))
+
+if [[ -n $action ]]; then
+	case $# in
+		0) error 'You must specify a directory.'; usage ;;
+		1)
+			args=("$1" "$action")
+			[[ -n $action_arg ]] && args+=("$action_arg")
+			set -- "${args[@]}"
+			unset args action action_arg
+			;;
+		*) error 'Extra arguments.'; usage ;;
+	esac
+else
+	if (( $# < 2 )); then
+		error 'You must specify a directory and an action.'
+		usage
+	fi
+fi
+
+working_dir="$(readlink -f "${1}")"
+shift 1
+[[ -z $working_dir ]] && die 'Please specify a working directory.'
+
+action=$1
+shift 1
+case "$action" in
+	-i) PKGS=("$@") ;;
+	-r) RUN="$*" ;;
+	-u)
+		(( $# > 0 )) && { error 'Extra arguments.'; usage; }
+		RUN='/bin/sh -c "pacman -Syu --noconfirm && (pacman -Qqu >/dev/null && pacman -Su --noconfirm || exit 0)"'
+		;;
+	-h) usage 0 ;;
+	-*) error "invalid argument '${action#-}'"; usage ;;
+	*) PKGS=("$action" "$@") ;; # for compatability with mkarchroot
+esac
+unset action
+
+################################################################################
+
 if (( $EUID != 0 )); then
 	die 'This script must be run as root.'
 fi
-
-shift $(($OPTIND - 1))
-
-if [[ -z $RUN ]] && (( $# < 2 )); then
-	die 'You must specify a directory and one or more packages.'
-elif (( $# < 1 )); then
-	die 'You must specify a directory.'
-fi
-
-working_dir="$(readlink -f ${1})"
-shift 1
-
-[[ -z $working_dir ]] && die 'Please specify a working directory.'
 
 if [[ -z $cache_dir ]]; then
 	cache_dirs=($(pacman -v $cache_conf 2>&1 | grep '^Cache Dirs:' | sed 's/Cache Dirs:\s*//g'))
@@ -259,7 +294,7 @@ else
 		if [[ $FORCE = 'y' ]]; then
 			pacargs="$pacargs --force"
 		fi
-		if ! pacstrap -GMcd "${working_dir}" ${pacargs} $@; then
+		if ! pacstrap -GMcd "${working_dir}" ${pacargs} "${PKGS[@]}"; then
 			die 'Failed to install all packages'
 		fi
 	fi
