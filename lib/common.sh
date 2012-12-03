@@ -113,6 +113,7 @@ lock_open_write() {
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ $(readlink -f /dev/fd/$fd) != "${path}.lock" ]]; then
+		mkdir -p "${path%/*}"
 		eval "exec $fd>${path}.lock"
 	fi
 
@@ -133,6 +134,7 @@ lock_open_read() {
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ $(readlink -f /dev/fd/$fd) != "${path}.lock" ]]; then
+		mkdir -p "${path%/*}"
 		eval "exec $fd>${path}.lock"
 	fi
 
