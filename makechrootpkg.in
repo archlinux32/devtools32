@@ -115,14 +115,14 @@ umask 0022
 
 # Lock the chroot we want to use. We'll keep this lock until we exit.
 # Note this is the same FD number as in mkarchroot
-lock_open_write 9 "$copydir.lock" "Locking chroot copy '$copy'"
+lock_open_write 9 "$copydir.lock" "Locking chroot copy [$copy]"
 
 if [[ ! -d $copydir ]] || $clean_first; then
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
 	lock_open_read 8 "$chrootdir/root" "Locking clean chroot"
 
-	stat_busy 'Creating clean working copy'
+	stat_busy "Creating clean working copy [$copy]"
 	use_rsync=false
 	if type -P btrfs >/dev/null; then
 		[[ -d $copydir ]] && btrfs subvolume delete "$copydir" &>/dev/null
