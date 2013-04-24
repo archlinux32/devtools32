@@ -90,7 +90,7 @@ shift 1
 
 if [[ $MODE == u ]]; then
 	MODE=r
-	set -- /bin/sh -c 'pacman -Syu --noconfirm && (pacman -Qqu >/dev/null && pacman -Su --noconfirm || exit 0)'
+	set -- pacman -Syu --noconfirm
 fi
 
 ################################################################################
@@ -155,7 +155,7 @@ chroot_run() {
 	if [[ $NONETWORK = y ]]; then
 		nspawn_args+=(--private-network)
 	fi
-	eval systemd-nspawn "${nspawn_args[@]}" -- "${@}" 2>/dev/null
+	systemd-nspawn "${nspawn_args[@]}" -- "${@}" 2>/dev/null
 }
 
 # }}}
