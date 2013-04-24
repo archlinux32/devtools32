@@ -10,7 +10,7 @@
 
 m4_include(lib/common.sh)
 
-CHROOT_VERSION='v2'
+CHROOT_VERSION='v3'
 
 FORCE='n'
 MODE='i'
@@ -187,8 +187,10 @@ elif [[ $MODE == i ]]; then
 		mkdir -p "${working_dir}"
 	fi
 
-	if { type -P btrfs && btrfs subvolume create "${working_dir}"; } &>/dev/null; then
-		chmod 0755 "${working_dir}"
+	if [[ "$(stat -f -c %T "${working_dir}")" == btrfs ]]; then
+		if { type -P btrfs && btrfs subvolume create "${working_dir}"; } &>/dev/null; then
+			chmod 0755 "${working_dir}"
+		fi
 	fi
 
 	chroot_lock

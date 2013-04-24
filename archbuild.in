@@ -53,7 +53,9 @@ if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 
 		lock_open_write 9 "$copy.lock" "Locking chroot copy '$copy'"
 
-		{ type -P btrfs && btrfs subvolume delete "${copy}"; } &>/dev/null
+		if [[ "$(stat -f -c %T "${copy}")" == btrfs ]]; then
+			{ type -P btrfs && btrfs subvolume delete "${copy}"; } &>/dev/null
+		fi
 		rm -rf --one-file-system "${copy}"
 	done
 	lock_close 9
