@@ -116,31 +116,21 @@ if echo "${host_mirror}" | grep -q 'file://'; then
 fi
 
 # {{{ functions
-bind_mount() {
-	local mode="${2:-rw}"
-	local target="${working_dir}${1}"
+build_mount_args() {
+	local p
+	declare -g mount_args=()
 
-	if [[ ! -e "$target" ]]; then
-		if [[ -d "$1" ]]; then
-			install -d "$target"
-		else
-			install -D /dev/null "$target"
-		fi
+	if [[ -n $host_mirror_path ]]; then
+		printf -v p '%q' "$host_mirror_path"
+		mount_args+=(--bind-ro="$p")
 	fi
 
-	mount -o bind "$1" "$target"
-	mount -o remount,${mode},bind "$target"
-	mount --make-slave "$target"
-}
+	printf -v p '%q' "${cache_dirs[0]}"
+	mount_args+=(--bind="$p")
 
-chroot_mount() {
-	trap 'trap_chroot_umount' EXIT INT QUIT TERM HUP
-
-	[[ -n $host_mirror_path ]] && bind_mount "$host_mirror_path" ro
-
-	bind_mount "${cache_dirs[0]}"
 	for cache_dir in ${cache_dirs[@]:1}; do
-		bind_mount "$cache_dir" ro
+		printf -v p '%q' "$cache_dir"
+		mount_args+=(--bind-ro="$p")
 	done
 }
 
@@ -159,22 +149,6 @@ copy_hostconf () {
 	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n ${cache_dirs[@]})|g" -i ${working_dir}/etc/pacman.conf
 }
 
-trap_unmount_err () {
-	error "Error unmounting"
-}
-
-trap_chroot_umount () {
-	trap 'trap_unmount_err' INT QUIT TERM HUP EXIT
-
-	for cache_dir in ${cache_dirs[@]}; do
-		umount "${working_dir}/${cache_dir}"
-	done
-	[[ -n $host_mirror_path ]] && umount "${working_dir}/${host_mirror_path}"
-
-	trap 'trap_abort' INT QUIT TERM HUP
-	trap 'trap_exit' EXIT
-}
-
 chroot_lock () {
 	lock_open_write 9 "${working_dir}" "Locking chroot"
 }
@@ -182,7 +156,7 @@ chroot_lock () {
 chroot_run() {
 	local dir=$1
 	shift
-	local nspawn_args=(-D "$dir")
+	local nspawn_args=(-D "$dir" "${mount_args[@]}")
 	if [[ $NONETWORK = y ]]; then
 		nspawn_args+=(--private-network)
 	fi
@@ -202,7 +176,7 @@ if [[ -n $RUN ]]; then
 	fi
 
 	chroot_lock
-	chroot_mount
+	build_mount_args
 	copy_hostconf
 
 	chroot_run "${working_dir}" ${RUN}
@@ -219,18 +193,17 @@ else
 	fi
 
 	chroot_lock
-	chroot_mount
 
-	pacargs="${cache_dirs[@]/#/--cachedir=}"
+	pacargs=("${cache_dirs[@]/#/--cachedir=}")
 	if [[ -n $pac_conf ]]; then
-		pacargs="$pacargs --config=${pac_conf}"
+		pacargs+=("--config=${pac_conf}")
 	fi
 
 	if (( $# != 0 )); then
 		if [[ $FORCE = 'y' ]]; then
-			pacargs="$pacargs --force"
+			pacargs+=("--force")
 		fi
-		if ! pacstrap -GMcd "${working_dir}" ${pacargs} "${PKGS[@]}"; then
+		if ! pacstrap -GMcd "${working_dir}" "${pacargs[@]}" "${PKGS[@]}"; then
 			die 'Failed to install all packages'
 		fi
 	fi
