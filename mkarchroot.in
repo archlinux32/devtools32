@@ -13,7 +13,7 @@ m4_include(lib/common.sh)
 CHROOT_VERSION='v2'
 
 FORCE='n'
-RUN=''
+MODE='i'
 NOCOPY='n'
 NONETWORK='n'
 
@@ -23,7 +23,7 @@ APPNAME=$(basename "${0}")
 
 # usage: usage <exitvalue>
 usage() {
-	echo "Usage: ${APPNAME} [options] working-dir [action]"
+	echo "Usage: ${APPNAME} [options] working-dir [exta-arguments]"
 	echo ' options:'
 	echo '    -f            Force overwrite of files in the working-dir'
 	echo '    -C <file>     Location of a pacman config file'
@@ -31,10 +31,11 @@ usage() {
 	echo '    -n            Do not copy config files into the chroot'
 	echo '    -c <dir>      Set pacman cache'
 	echo '    -N            Disable networking in the chroot'
-	echo ' actions:'
-	echo '    -i <pkg-list> Install "pkg-list" in the chroot.'
-	echo '                  Creates the chroot if necessary, workding-dir must exist'
-	echo '    -r <cmd>      Run "cmd" within the context of the chroot'
+	echo ' modes:'
+	echo '    -i            Install the packages "extra-arguments" in the chroot.'
+	echo '                  This creates the chroot if it does not exist.'
+	echo '                  This is the default mode.'
+	echo '    -r            Run the command "extra-arguments" within the chroot'
 	echo '    -u            Update the chroot via pacman'
 	echo '    -h            Print this message'
 
@@ -43,7 +44,7 @@ usage() {
 
 ################################################################################
 
-while getopts 'fC:M:nc:Nr:uh' arg; do
+while getopts 'fC:M:nc:Niruh' arg; do
 	case "${arg}" in
 		f) FORCE='y' ;;
 		C) pac_conf="$OPTARG" ;;
@@ -52,8 +53,8 @@ while getopts 'fC:M:nc:Nr:uh' arg; do
 		c) cache_dir="$OPTARG" ;;
 		N) NONETWORK='y' ;;
 
-		r) action="-$arg"; action_arg="$OPTARG" ;;
-		u|h) action="-$arg" ;;
+		i|r|u) MODE="$arg" ;;
+		h) usage 0 ;;
 
 		*) error "invalid argument '${arg}'"; usage ;;
 	esac
@@ -61,42 +62,36 @@ done
 
 shift $(($OPTIND - 1))
 
-if [[ -n $action ]]; then
-	case $# in
-		0) error 'You must specify a directory.'; usage ;;
-		1)
-			args=("$1" "$action")
-			[[ -n $action_arg ]] && args+=("$action_arg")
-			set -- "${args[@]}"
-			unset args action action_arg
-			;;
-		*) error 'Extra arguments.'; usage ;;
-	esac
-else
-	if (( $# < 2 )); then
-		error 'You must specify a directory and an action.'
-		usage
-	fi
-fi
+case $MODE in
+	i)
+		case $# in
+			0) die 'You must specify a directory and one or more packages.' ;;
+			1) die 'You must specify one or more packages.' ;;
+		esac
+		;;
+	r)
+		case $# in
+			0) die 'You must specify a directory and a command.' ;;
+			1) die 'You must specify a command.' ;;
+		esac
+		;;
+	u)
+		case $# in
+			0) die 'You must specify a directory.' ;;
+			1) : ;;
+			2) die 'Extra arguments' ;;
+		esac
+		;;
+esac
 
 working_dir="$(readlink -f "${1}")"
 shift 1
 [[ -z $working_dir ]] && die 'Please specify a working directory.'
 
-action=$1
-shift 1
-case "$action" in
-	-i) PKGS=("$@") ;;
-	-r) RUN="$*" ;;
-	-u)
-		(( $# > 0 )) && { error 'Extra arguments.'; usage; }
-		RUN='/bin/sh -c "pacman -Syu --noconfirm && (pacman -Qqu >/dev/null && pacman -Su --noconfirm || exit 0)"'
-		;;
-	-h) usage 0 ;;
-	-*) error "invalid argument '${action#-}'"; usage ;;
-	*) PKGS=("$action" "$@") ;; # for compatability with mkarchroot
-esac
-unset action
+if [[ $MODE == u ]]; then
+	MODE=r
+	set -- /bin/sh -c 'pacman -Syu --noconfirm && (pacman -Qqu >/dev/null && pacman -Su --noconfirm || exit 0)'
+fi
 
 ################################################################################
 
@@ -166,7 +161,7 @@ chroot_run() {
 # }}}
 
 umask 0022
-if [[ -n $RUN ]]; then
+if [[ $MODE == r ]]; then
 	# run chroot {{{
 	#Sanity check
 	if [[ ! -f "${working_dir}/.arch-chroot" ]]; then
@@ -179,10 +174,10 @@ if [[ -n $RUN ]]; then
 	build_mount_args
 	copy_hostconf
 
-	chroot_run "${working_dir}" ${RUN}
+	chroot_run "${working_dir}" "$@"
 
 	# }}}
-else
+elif [[ $MODE == i ]]; then
 	# {{{ build chroot
 	if [[ -e $working_dir && $FORCE = 'n' ]]; then
 		die "Working directory '${working_dir}' already exists - try using -f"
@@ -206,7 +201,7 @@ else
 	if [[ $FORCE = 'y' ]]; then
 		pacargs+=("--force")
 	fi
-	if ! pacstrap -GMcd "${working_dir}" "${pacargs[@]}" "${PKGS[@]}"; then
+	if ! pacstrap -GMcd "${working_dir}" "${pacargs[@]}" "$@"; then
 		die 'Failed to install all packages'
 	fi
 
