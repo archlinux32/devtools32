@@ -12,6 +12,12 @@ m4_include(lib/common.sh)
 
 shopt -s nullglob
 
+# So that usage conflicts between upstream and -par mkarchroot don't get hidden
+# silently in a merge.
+archroot() {
+	mkarchroot "$@"
+}
+
 makepkg_args='-s --noconfirm -L'
 repack=false
 update_first=false
@@ -151,7 +157,7 @@ if [[ -n "${install_pkgs[*]}" ]]; then
 		pkgname="${install_pkg##*/}"
 		cp "$install_pkg" "$copydir/$pkgname"
 
-		mkarchroot -r "pacman -U /$pkgname --noconfirm" "$copydir"
+		archroot -r "$copydir" pacman -U "/$pkgname" --noconfirm
 		(( ret += !! $? ))
 
 		rm "$copydir/$pkgname"
@@ -161,7 +167,7 @@ if [[ -n "${install_pkgs[*]}" ]]; then
 	[[ -f PKGBUILD ]] || exit $ret
 fi
 
-$update_first && mkarchroot -u "$copydir"
+$update_first && archroot -u "$copydir"
 
 mkdir -p "$copydir/build"
 
@@ -277,7 +283,7 @@ exit 0
 EOF
 chmod +x "$copydir/chrootbuild"
 
-if mkarchroot -r "/chrootbuild" "$copydir"; then
+if archroot -r "$copydir" "/chrootbuild"; then
 	for pkgfile in "$copydir"/pkgdest/*.pkg.tar.?z; do
 		if $add_to_db; then
 			mkdir -p "$copydir/repo"
