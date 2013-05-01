@@ -127,12 +127,14 @@ chroottype=$(stat -f -c %T "$chrootdir")
 
 # Lock the chroot we want to use. We'll keep this lock until we exit.
 # Note this is the same FD number as in mkarchroot
-lock_open_write 9 "$copydir.lock" "Locking chroot copy [$copy]"
+lock_open_write 9 "$copydir" \
+	"Waiting for existing lock on chroot copy to be released: [$copy]"
 
 if [[ ! -d $copydir ]] || $clean_first; then
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
-	lock_open_read 8 "$chrootdir/root" "Locking clean chroot"
+	lock_open_read 8 "$chrootdir/root" \
+		"Waiting for existing lock on clean chroot to be released"
 
 	stat_busy "Creating clean working copy [$copy]"
 	if [[ "$chroottype" == btrfs ]]; then
