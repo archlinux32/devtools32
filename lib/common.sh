@@ -40,12 +40,12 @@ msg2() {
 
 warning() {
 	local mesg=$1; shift
-	printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${YELLOW}==> $(gettext "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 error() {
 	local mesg=$1; shift
-	printf "${RED}==> ERROR:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 stat_busy() {
@@ -54,7 +54,7 @@ stat_busy() {
 }
 
 stat_done() {
-	printf "${BOLD}done${ALL_OFF}\n" >&2
+	printf "${BOLD}$(gettext "done")${ALL_OFF}\n" >&2
 }
 
 _setup_workdir=false
