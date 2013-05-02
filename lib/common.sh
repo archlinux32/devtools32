@@ -11,8 +11,22 @@ set +u +o posix
 . /usr/share/makepkg/util.sh
 $_INCLUDE_COMMON_SH
 
-# Avoid any encoding problems
-export LANG=C
+[[ -n ${TEXTDOMAIN:-}    ]] || export TEXTDOMAIN='libretools'
+[[ -n ${TEXTDOMAINDIR:-} ]] || export TEXTDOMAINDIR='/usr/share/locale'
+
+if type gettext &>/dev/null; then
+	_() { gettext "$@"; }
+else
+	_() { echo "$@"; }
+fi
+
+_l() {
+	TEXTDOMAIN='librelib' TEXTDOMAINDIR='/usr/share/locale' "$@"
+}
+
+_p() {
+	TEXTDOMAIN='pacman-scripts' TEXTDOMAINDIR='/usr/share/locale' "$@"
+}
 
 shopt -s extglob
 
@@ -24,15 +38,36 @@ else
 	declare -gr ALL_OFF='' BOLD='' BLUE='' GREEN='' RED='' YELLOW=''
 fi
 
+# makepkg message functions expect gettext to already be called; like
+# `msg "$(gettext 'Hello World')"`.  Where libretools expects the
+# message functions to call gettext.  So, we'll do some magic to wrap
+# the makepkg versions.
+eval "$(
+	fns=(
+		plain
+		msg
+		msg2
+		warning
+		error
+	)
+
+	# declare _makepkg_${fn} as a copy of ${fn}
+	declare -f "${fns[@]}" | sed 's/^[a-z]/_makepkg_&/'
+
+	# re-declare ${fn} as a wrapper around _makepkg_${fn}
+	printf '%s() { local mesg; mesg="$(_ "$1")"; _p _makepkg_"${FUNCNAME[0]}" "$mesg" "${@:2}"; }\n' \
+	       "${fns[@]}"
+)"
+
 stat_busy() {
-	local mesg=$1; shift
+	local mesg; mesg="$(_ "$1")"; shift
 	# shellcheck disable=2059
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
 	# shellcheck disable=2059
-	printf "${BOLD}done${ALL_OFF}\n" >&2
+	printf "${BOLD}$(_l _ "done")${ALL_OFF}\n" >&2
 }
 
 _setup_workdir=false
@@ -51,7 +86,7 @@ cleanup() {
 }
 
 abort() {
-	error 'Aborting...'
+	_l error 'Aborting...'
 	cleanup 255
 }
 
@@ -74,7 +109,8 @@ die() {
 ##
 #  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-lock() {
+lock() # newline here to avoid confusing xgettext
+{
 	# Only reopen the FD if it wasn't handed to us
 	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
 		mkdir -p -- "$(dirname -- "$2")"
@@ -91,7 +127,8 @@ lock() {
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-slock() {
+slock() # newline here to avoid confusing xgettext
+{
 	# Only reopen the FD if it wasn't handed to us
 	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
 		mkdir -p -- "$(dirname -- "$2")"
@@ -179,7 +216,7 @@ find_cached_package() {
 			return 0
 			;;
 		*)
-			error 'Multiple packages found:'
+			_l error 'Multiple packages found:'
 			printf '\t%s\n' "${results[@]}" >&2
 			return 1
 	esac
