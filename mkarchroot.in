@@ -12,7 +12,7 @@ m4_include(lib/common.sh)
 
 CHROOT_VERSION='v3'
 
-MODE='i'
+MODE='m'
 NOCOPY='n'
 NONETWORK='n'
 
@@ -30,8 +30,8 @@ usage() {
 	echo '    -c <dir>      Set pacman cache'
 	echo '    -N            Disable networking in the chroot'
 	echo ' modes:'
-	echo '    -i            Install the packages "extra-arguments" in the chroot.'
-	echo '                  This creates the chroot if it does not exist.'
+	echo '    -m            Make a new chroot in working-dir with packages'
+	echo '                  "extra-arguments" installed.'
 	echo '                  This is the default mode.'
 	echo '    -r            Run the command "extra-arguments" within the chroot'
 	echo '    -u            Update the chroot via pacman'
@@ -42,7 +42,7 @@ usage() {
 
 ################################################################################
 
-while getopts 'C:M:nc:Niruh' arg; do
+while getopts 'C:M:nc:Nmruh' arg; do
 	case "${arg}" in
 		C) pac_conf="$OPTARG" ;;
 		M) makepkg_conf="$OPTARG" ;;
@@ -50,7 +50,7 @@ while getopts 'C:M:nc:Niruh' arg; do
 		c) cache_dir="$OPTARG" ;;
 		N) NONETWORK='y' ;;
 
-		i|r|u) MODE="$arg" ;;
+		m|r|u) MODE="$arg" ;;
 		h) usage 0 ;;
 
 		*) error "invalid argument '${arg}'"; usage ;;
@@ -60,7 +60,7 @@ done
 shift $(($OPTIND - 1))
 
 case $MODE in
-	i)
+	m)
 		case $# in
 			0) die 'You must specify a directory and one or more packages.' ;;
 			1) die 'You must specify one or more packages.' ;;
@@ -174,7 +174,7 @@ if [[ $MODE == r ]]; then
 	chroot_run "${working_dir}" "$@"
 
 	# }}}
-elif [[ $MODE == i ]]; then
+elif [[ $MODE == m ]]; then
 	# {{{ build chroot
 	if [[ -e $working_dir ]]; then
 		die "Working directory '${working_dir}' already exists"
