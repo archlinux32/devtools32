@@ -289,8 +289,8 @@ if archroot -r "$copydir" "/chrootbuild"; then
 	for pkgfile in "$copydir"/pkgdest/*.pkg.tar.?z; do
 		if $add_to_db; then
 			mkdir -p "$copydir/repo"
+			cp "$pkgfile" "$copydir/repo"
 			pushd "$copydir/repo" >/dev/null
-			cp "$pkgfile" .
 			repo-add repo.db.tar.gz "${pkgfile##*/}"
 			popd >/dev/null
 		fi
