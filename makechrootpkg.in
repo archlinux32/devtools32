@@ -286,9 +286,9 @@ EOF
 chmod +x "$copydir/chrootbuild"
 
 if archroot -r "$copydir" "/chrootbuild"; then
+	mkdir -p "$copydir/repo"
 	for pkgfile in "$copydir"/pkgdest/*.pkg.tar.?z; do
 		if $add_to_db; then
-			mkdir -p "$copydir/repo"
 			cp "$pkgfile" "$copydir/repo"
 			pushd "$copydir/repo" >/dev/null
 			repo-add repo.db.tar.gz "${pkgfile##*/}"
