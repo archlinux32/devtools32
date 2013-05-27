@@ -2,7 +2,7 @@
 export LANG=C
 
 # check if messages are to be printed using color
-unset ALL_OFF BOLD BLUE GREEN RED YELLOW
+declare ALL_OFF= BOLD= BLUE= GREEN= RED= YELLOW=
 if [[ -t 2 ]]; then
 	# prefer terminal safe colored and bold text when tput is supported
 	if tput setaf 0 &>/dev/null; then
