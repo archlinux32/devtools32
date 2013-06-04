@@ -59,17 +59,17 @@ stat_done() {
 
 _setup_workdir=false
 setup_workdir() {
-	[[ -z $WORKDIR ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
+	[[ -z ${WORKDIR:-} ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
 	_setup_workdir=true
 	trap 'trap_abort' INT QUIT TERM HUP
 	trap 'trap_exit' EXIT
 }
 
 cleanup() {
-	if [[ -n $WORKDIR ]] && $_setup_workdir; then
+	if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
 		rm -rf "$WORKDIR"
 	fi
-	[[ -n $1 ]] && exit $1
+	[[ -n ${1:-} ]] && exit $1
 }
 
 abort() {
