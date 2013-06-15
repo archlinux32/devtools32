@@ -208,7 +208,8 @@ prepare_chroot() {
 		echo 'LOGDEST="/logdest"' >> "$copydir/etc/makepkg.conf"
 	fi
 
-	# These two get bind-mounted
+	# These two get bind-mounted read-only
+	# XXX: makepkg dislikes having these dirs read-only, so separate them
 	mkdir -p "$copydir/startdir" "$copydir/startdir_host"
 	mkdir -p "$copydir/srcdest" "$copydir/srcdest_host"
 	if ! grep -q 'SRCDEST="/srcdest"' "$copydir/etc/makepkg.conf"; then
@@ -237,29 +238,8 @@ EOF
 
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
-	cat >"$copydir/chrootbuild" <<EOF
-#!/bin/bash
-. /etc/profile
-export HOME=/build
-shopt -s nullglob
-
-# Workaround makepkg disliking read-only dirs
-ln -sft /srcdest /srcdest_host/*
-ln -sft /startdir /startdir_host/*
-
-cd /startdir
-sudo -u nobody makepkg $makepkg_args || exit 1
-
-if $run_namcap; then
-	pacman -S --needed --noconfirm namcap
-	for pkgfile in /startdir/PKGBUILD /pkgdest/*; do
-		echo "Checking \${pkgfile##*/}"
-		sudo -u nobody namcap "\$pkgfile" 2>&1 | tee "/logdest/\${pkgfile##*/}-namcap.log"
-	done
-fi
-
-exit 0
-EOF
+	printf $'#!/bin/bash\n%s\n_chrootbuild %q %q' "$(declare -f _chrootbuild)" \
+		"$makepkg_args" "$run_namcap" >"$copydir/chrootbuild"
 	chmod +x "$copydir/chrootbuild"
 }
 
@@ -280,6 +260,57 @@ download_sources() {
 
 	# Clean up garbage from verifysource
 	rm -rf $builddir
+}
+
+_chrootbuild() {
+	# This function isn't run in makechrootpkg,
+	# so no global variables
+	local makepkg_args="$1"
+	local run_namcap="$2"
+
+	. /etc/profile
+	export HOME=/build
+	shopt -s nullglob
+
+	# XXX: Workaround makepkg disliking read-only dirs
+	ln -sft /srcdest /srcdest_host/*
+	ln -sft /startdir /startdir_host/*
+
+	# XXX: Keep svn sources writable
+	# Since makepkg 4.1.1 they get checked out via cp -a, copying the symlink
+	for dir in /srcdest /startdir; do
+		cd $dir
+		for svndir in */.svn; do
+			rm ${svndir%/.svn}
+			cp -a ${dir}_host/${svndir%/.svn} .
+			chown -R nobody ${svndir%/.svn}
+		done
+	done
+
+	cd /startdir
+
+	# XXX: Keep PKGBUILD writable for pkgver()
+	rm PKGBUILD*
+	cp /startdir_host/PKGBUILD* .
+	chown nobody PKGBUILD*
+
+	# Safety check
+	if [[ ! -w PKGBUILD ]]; then
+		echo "Can't write to PKGBUILD!"
+		exit 1
+	fi
+
+	sudo -u nobody makepkg $makepkg_args || exit 1
+
+	if $run_namcap; then
+		pacman -S --needed --noconfirm namcap
+		for pkgfile in /startdir/PKGBUILD /pkgdest/*; do
+			echo "Checking ${pkgfile##*/}"
+			sudo -u nobody namcap "$pkgfile" 2>&1 | tee "/logdest/${pkgfile##*/}-namcap.log"
+		done
+	fi
+
+	exit 0
 }
 
 move_products() {
