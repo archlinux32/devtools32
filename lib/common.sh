@@ -107,57 +107,6 @@ in_array() {
 }
 
 ##
-#  usage : lock_open_write( $fd, $path.lock, $wait_message )
-##
-lock_open_write() {
-	local fd=$1
-	local path=$2
-	local msg=$3
-
-	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}")" ]]; then
-		mkdir -p "${path%/*}"
-		eval "exec $fd>${path}"
-	fi
-
-	if ! flock -n $fd; then
-		stat_busy "$msg"
-		flock $fd
-		stat_done
-	fi
-}
-
-##
-#  usage : lock_open_read( $fd, $path.lock, $wait_message )
-##
-lock_open_read() {
-	local fd=$1
-	local path=$2
-	local msg=$3
-
-	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}")" ]]; then
-		mkdir -p "${path%/*}"
-		eval "exec $fd>${path}"
-	fi
-
-	if ! flock -sn $fd; then
-		stat_busy "$msg"
-		flock -s $fd
-		stat_done
-	fi
-}
-
-
-##
-#  usage : lock_close( $fd )
-##
-lock_close() {
-	local fd=$1
-	eval "exec $fd>&-"
-}
-
-##
 #  usage : get_full_version( [$pkgname] )
 # return : full version spec, including epoch (if necessary), pkgver, pkgrel
 ##
@@ -183,4 +132,55 @@ get_full_version() {
 			echo $epoch_override:$pkgver_override-$pkgrel_override
 		fi
 	fi
+}
+
+##
+#  usage : lock( $fd, $file, $message )
+##
+lock() {
+	local fd=$1
+	local file=$2
+	local mesg=$3
+
+	# Only reopen the FD if it wasn't handed to us
+	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
+		mkdir -p "${file%/*}"
+		eval "exec $fd>"'"$file"'
+	fi
+
+	if ! flock -n $fd; then
+		stat_busy "$mesg"
+		flock $fd
+		stat_done
+	fi
+}
+
+##
+#  usage : slock( $fd, $file, $message )
+##
+slock() {
+	local fd=$1
+	local file=$2
+	local mesg=$3
+
+	# Only reopen the FD if it wasn't handed to us
+	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
+		mkdir -p "${file%/*}"
+		eval "exec $fd>"'"$file"'
+	fi
+
+	eval "exec $fd>"'"$file"'
+	if ! flock -sn $fd; then
+		stat_busy "$mesg"
+		flock -s $fd
+		stat_done
+	fi
+}
+
+##
+#  usage : lock_close( $fd )
+##
+lock_close() {
+	local fd=$1
+	eval "exec $fd>&-"
 }
