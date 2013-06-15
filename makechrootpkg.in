@@ -12,7 +12,8 @@ m4_include(lib/common.sh)
 
 shopt -s nullglob
 
-makepkg_args='-s --noconfirm -L --holdver'
+_makepkg_args=(-s --noconfirm -L --holdver)
+makepkg_args=("${_makepkg_args[@]}")
 repack=false
 update_first=false
 clean_first=false
@@ -43,7 +44,7 @@ usage() {
 	echo 'command:'
 	echo '    mkarchroot <chrootdir>/root base-devel'
 	echo ''
-	echo "Default makepkg args: $makepkg_args"
+	echo "Default makepkg args: ${_makepkg_args[*]}"
 	echo ''
 	echo 'Flags:'
 	echo '-h         This help'
@@ -69,11 +70,12 @@ while getopts 'hcur:I:l:nT' arg; do
 		r) passeddir="$OPTARG" ;;
 		I) install_pkgs+=("$OPTARG") ;;
 		l) copy="$OPTARG" ;;
-		n) run_namcap=true; makepkg_args="$makepkg_args -i" ;;
+		n) run_namcap=true; makepkg_args+=('-i') ;;
 		T) temp_chroot=true; copy+="-$$" ;;
-		*) makepkg_args="$makepkg_args -$arg $OPTARG" ;;
+		*) usage >&2 ;;
 	esac
 done
+shift $(($OPTIND - 1))
 
 (( EUID != 0 )) && die 'This script must be run as root.'
 
@@ -94,15 +96,12 @@ else
 fi
 
 # Pass all arguments after -- right to makepkg
-makepkg_args="$makepkg_args ${*:$OPTIND}"
+makepkg_args+=("$@")
 
 # See if -R was passed to makepkg
-for arg in ${*:$OPTIND}; do
-	if [[ $arg = -R ]]; then
-		repack=true
-		break
-	fi
-done
+if in_array '-R' "${makepkg_args[@]}"; then
+	repack=true
+fi
 
 if [[ -n $SUDO_USER ]]; then
 	USER_HOME=$(eval echo ~$SUDO_USER)
@@ -238,8 +237,8 @@ EOF
 
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
-	printf $'#!/bin/bash\n%s\n_chrootbuild %q %q' "$(declare -f _chrootbuild)" \
-		"$makepkg_args" "$run_namcap" >"$copydir/chrootbuild"
+	printf $'#!/bin/bash\n%s\n_chrootbuild %q "$@"' "$(declare -f _chrootbuild)" \
+		"$run_namcap" >"$copydir/chrootbuild"
 	chmod +x "$copydir/chrootbuild"
 }
 
@@ -265,8 +264,8 @@ download_sources() {
 _chrootbuild() {
 	# This function isn't run in makechrootpkg,
 	# so no global variables
-	local makepkg_args="$1"
-	local run_namcap="$2"
+	local run_namcap="$1"; shift
+	local makepkg_args=("$@")
 
 	. /etc/profile
 	export HOME=/build
@@ -300,7 +299,7 @@ _chrootbuild() {
 		exit 1
 	fi
 
-	sudo -u nobody makepkg $makepkg_args || exit 1
+	sudo -u nobody makepkg "${makepkg_args[@]}" || exit 1
 
 	if $run_namcap; then
 		pacman -S --needed --noconfirm namcap
@@ -349,7 +348,7 @@ download_sources
 if arch-nspawn "$copydir" \
 	--bind-ro="$PWD:/startdir_host" \
 	--bind-ro="$SRCDEST:/srcdest_host" \
-	/chrootbuild
+	/chrootbuild "${makepkg_args[@]}"
 then
 	move_products
 else
