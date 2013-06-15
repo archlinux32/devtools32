@@ -107,7 +107,7 @@ in_array() {
 }
 
 ##
-#  usage : lock_open_write( $fd, $path, $wait_message )
+#  usage : lock_open_write( $fd, $path.lock, $wait_message )
 ##
 lock_open_write() {
 	local fd=$1
@@ -115,9 +115,9 @@ lock_open_write() {
 	local msg=$3
 
 	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}.lock")" ]]; then
+	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}")" ]]; then
 		mkdir -p "${path%/*}"
-		eval "exec $fd>${path}.lock"
+		eval "exec $fd>${path}"
 	fi
 
 	if ! flock -n $fd; then
@@ -128,7 +128,7 @@ lock_open_write() {
 }
 
 ##
-#  usage : lock_open_read( $fd, $path, $wait_message )
+#  usage : lock_open_read( $fd, $path.lock, $wait_message )
 ##
 lock_open_read() {
 	local fd=$1
@@ -136,9 +136,9 @@ lock_open_read() {
 	local msg=$3
 
 	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}.lock")" ]]; then
+	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "${path}")" ]]; then
 		mkdir -p "${path%/*}"
-		eval "exec $fd>${path}.lock"
+		eval "exec $fd>${path}"
 	fi
 
 	if ! flock -sn $fd; then
