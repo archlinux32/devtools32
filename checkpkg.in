@@ -35,7 +35,7 @@ for _pkgname in "${pkgname[@]}"; do
 	elif [[ -f "$PKGDEST/$pkgfile" ]]; then
 		ln -s "$PKGDEST/$pkgfile" "$pkgfile"
 	else
-		die "File \"$pkgfile\" doesn't exist"
+		die "File \"%s\" doesn't exist" "$pkgfile"
 	fi
 
 	pkgurl=$(pacman -Spdd --print-format '%l' --noconfirm "$_pkgname")
@@ -80,4 +80,4 @@ for _pkgname in "${pkgname[@]}"; do
 	fi
 done
 
-msg "Files saved to $TEMPDIR"
+msg "Files saved to %s" "$TEMPDIR"
