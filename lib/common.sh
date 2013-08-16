@@ -50,7 +50,7 @@ error() {
 
 stat_busy() {
 	local mesg=$1; shift
-	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" >&2
+	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
@@ -140,7 +140,7 @@ get_full_version() {
 lock() {
 	local fd=$1
 	local file=$2
-	local mesg=$3
+	local mesg=("$@:3")
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
@@ -149,7 +149,7 @@ lock() {
 	fi
 
 	if ! flock -n $fd; then
-		stat_busy "$mesg"
+		stat_busy "${mesg[@]}"
 		flock $fd
 		stat_done
 	fi
@@ -161,7 +161,7 @@ lock() {
 slock() {
 	local fd=$1
 	local file=$2
-	local mesg=$3
+	local mesg=("$@:3")
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
@@ -171,7 +171,7 @@ slock() {
 
 	eval "exec $fd>"'"$file"'
 	if ! flock -sn $fd; then
-		stat_busy "$mesg"
+		stat_busy "${mesg[@]}"
 		flock -s $fd
 		stat_done
 	fi
