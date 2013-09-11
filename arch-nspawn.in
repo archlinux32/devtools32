@@ -98,10 +98,10 @@ copy_hostconf
 
 eval $(grep '^CARCH=' "$working_dir/etc/makepkg.conf")
 
-machine_name="${working_dir//\//-}"
-machine_name="${machine_name#-}"
+machine_name="${working_dir##*/}"
+machine_name="${machine_name//\./-}"
 
-exec ${CARCH:+setarch "$CARCH"} systemd-nspawn 2>/dev/null \
+exec ${CARCH:+setarch "$CARCH"} systemd-nspawn \
 	-D "$working_dir" \
 	--machine "$machine_name" \
 	"${mount_args[@]}" \
