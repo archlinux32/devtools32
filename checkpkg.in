@@ -76,7 +76,7 @@ for _pkgname in "${pkgname[@]}"; do
 		done
 		cd ..
 	else
-		msg "No soname differences for $_pkgname."
+		msg "No soname differences for %s." "$_pkgname"
 	fi
 done
 
