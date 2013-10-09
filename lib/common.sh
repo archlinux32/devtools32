@@ -140,7 +140,7 @@ get_full_version() {
 lock() {
 	local fd=$1
 	local file=$2
-	local mesg=("$@:3")
+	local mesg=("${@:3}")
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
@@ -161,7 +161,7 @@ lock() {
 slock() {
 	local fd=$1
 	local file=$2
-	local mesg=("$@:3")
+	local mesg=("${@:3}")
 
 	# Only reopen the FD if it wasn't handed to us
 	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
