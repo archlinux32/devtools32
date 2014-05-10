@@ -36,8 +36,8 @@ src_owner=${SUDO_USER:-$USER}
 usage() {
 	echo "Usage: ${0##*/} [options] -r <chrootdir> [--] [makepkg args]"
 	echo ' Run this script in a PKGBUILD dir to build a package inside a'
-	echo ' clean chroot. All unrecognized arguments passed to this script'
-	echo ' will be passed to makepkg.'
+	echo ' clean chroot. Arguments passed to this script after the'
+	echo ' end-of-options marker (--) will be passed to makepkg.'
 	echo ''
 	echo ' The chroot dir consists of the following directories:'
 	echo ' <chrootdir>/{root, copy} but only "root" is required'
@@ -79,12 +79,10 @@ while getopts 'hcur:I:l:nTD:d:' arg; do
 		l) copy="$OPTARG" ;;
 		n) run_namcap=true; makepkg_args+=('-i') ;;
 		T) temp_chroot=true; copy+="-$$" ;;
-		*) usage >&2 ;;
 	esac
 done
-shift $(($OPTIND - 1))
 
-(( EUID != 0 )) && die 'This script must be run as root.'
+check_root "$0" "$@"
 
 [[ ! -f PKGBUILD && -z "${install_pkgs[*]}" ]] && die 'This must be run in a directory containing a PKGBUILD.'
 
@@ -103,7 +101,7 @@ else
 fi
 
 # Pass all arguments after -- right to makepkg
-makepkg_args+=("$@")
+makepkg_args+=("${@:OPTIND}")
 
 # See if -R was passed to makepkg
 for arg in "${@:OPTIND}"; do
@@ -160,6 +158,9 @@ create_chroot() {
 		# Drop the read lock again
 		lock_close 8
 	fi
+
+	# Update mtime
+	touch "$copydir"
 }
 
 clean_temporary() {

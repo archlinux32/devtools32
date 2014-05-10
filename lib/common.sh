@@ -71,12 +71,12 @@ cleanup() {
 	if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
 		rm -rf "$WORKDIR"
 	fi
-	[[ -n ${1:-} ]] && exit $1
+	exit ${1:-0}
 }
 
 abort() {
-	msg 'Aborting...'
-	cleanup 0
+	error 'Aborting...'
+	cleanup 255
 }
 
 trap_abort() {
@@ -91,7 +91,7 @@ trap_exit() {
 
 die() {
 	(( $# )) && error "$@"
-	cleanup 1
+	cleanup 255
 }
 
 ##
@@ -117,7 +117,7 @@ get_full_version() {
 	pkgbase=${pkgbase:-${pkgname[0]}}
 	epoch=${epoch:-0}
 	if [[ -z $1 ]]; then
-		if [[ $epoch ]] && (( ! $epoch )); then
+		if (( ! epoch )); then
 			echo $pkgver-$pkgrel
 		else
 			echo $epoch:$pkgver-$pkgrel
@@ -257,4 +257,17 @@ find_cached_package() {
 			printf '\t%s\n' "${results[@]}" >&2
 			return 1
 	esac
+}
+
+##
+#  usage : check_root ("$0" "$@")
+##
+check_root() {
+	(( EUID == 0 )) && return
+	if type -P sudo >/dev/null; then
+		exec sudo -- "$@"
+	else
+		exec su root -c "$(printf '%q' "$@")"
+	fi
+	die 'This script must be run as root.'
 }
