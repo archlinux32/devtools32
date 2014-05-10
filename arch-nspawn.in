@@ -103,7 +103,7 @@ if [[ ${#machine_name} -gt "$HOST_NAME_MAX" ]]; then
 	machine_name="${machine_name#-}"
 fi
 
-exec ${CARCH:+setarch "$CARCH"} systemd-nspawn \
+exec ${CARCH:+setarch "$CARCH"} systemd-nspawn 2>/dev/null \
 	-D "$working_dir" \
 	--machine "$machine_name" \
 	"${mount_args[@]}" \
