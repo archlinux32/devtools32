@@ -49,7 +49,7 @@ pkgs="$@"
 
 SVNPATH='svn+ssh://nymeria.archlinux.org/srv/repos/svn-packages/svn'
 
-msg "Work will be done in %s/rebuilds" "$(pwd)"
+msg "Work will be done in %s" "$(pwd)/rebuilds"
 
 REBUILD_ROOT="$(pwd)/rebuilds"
 mkdir -p "$REBUILD_ROOT"

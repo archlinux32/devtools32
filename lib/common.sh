@@ -137,7 +137,7 @@ get_full_version() {
 }
 
 ##
-#  usage : lock( $fd, $file, $message )
+#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 lock() {
 	local fd=$1
@@ -158,7 +158,7 @@ lock() {
 }
 
 ##
-#  usage : slock( $fd, $file, $message )
+#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 slock() {
 	local fd=$1
@@ -171,7 +171,6 @@ slock() {
 		eval "exec $fd>"'"$file"'
 	fi
 
-	eval "exec $fd>"'"$file"'
 	if ! flock -sn $fd; then
 		stat_busy "${mesg[@]}"
 		flock -s $fd

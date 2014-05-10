@@ -12,8 +12,8 @@ m4_include(lib/common.sh)
 
 shopt -s nullglob
 
-_makepkg_args=(-s --noconfirm -L --holdver)
-makepkg_args=("${_makepkg_args[@]}")
+default_makepkg_args=(-s --noconfirm -L --holdver)
+makepkg_args=("${default_makepkg_args[@]}")
 repack=false
 update_first=false
 clean_first=false
@@ -47,7 +47,7 @@ usage() {
 	echo 'command:'
 	echo '    mkarchroot <chrootdir>/root base-devel'
 	echo ''
-	echo "Default makepkg args: ${_makepkg_args[*]}"
+	echo "Default makepkg args: ${default_makepkg_args[*]}"
 	echo ''
 	echo 'Flags:'
 	echo '-h         This help'
@@ -355,8 +355,8 @@ move_products() {
 
 umask 0022
 
-load_vars /etc/makepkg.conf
 load_vars "$USER_HOME/.makepkg.conf"
+load_vars /etc/makepkg.conf
 
 # Use PKGBUILD directory if these don't exist
 [[ -d $PKGDEST ]]    || PKGDEST=$PWD
