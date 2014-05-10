@@ -145,7 +145,7 @@ lock() {
 	local mesg=("${@:3}")
 
 	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
+	if ! [[ "/dev/fd/$fd" -ef "$file" ]]; then
 		mkdir -p "${file%/*}"
 		eval "exec $fd>"'"$file"'
 	fi
@@ -166,7 +166,7 @@ slock() {
 	local mesg=("${@:3}")
 
 	# Only reopen the FD if it wasn't handed to us
-	if [[ "$(readlink -f /dev/fd/$fd)" != "$(readlink -f "$file")" ]]; then
+	if ! [[ "/dev/fd/$fd" -ef "$file" ]]; then
 		mkdir -p "${file%/*}"
 		eval "exec $fd>"'"$file"'
 	fi
