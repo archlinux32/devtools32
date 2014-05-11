@@ -183,7 +183,7 @@ slock() {
 ##
 lock_close() {
 	local fd=$1
-	eval "exec $fd>&-"
+	exec {fd}>&-
 }
 
 ##
