@@ -67,9 +67,10 @@ usage() {
 	exit 1
 }
 
+orig_argv=("$@")
+
 while getopts 'hcur:I:l:nTD:d:' arg; do
 	case "$arg" in
-		h) usage ;;
 		c) clean_first=true ;;
 		D) bindmounts_ro+=(--bind-ro="$OPTARG") ;;
 		d) bindmounts_rw+=(--bind="$OPTARG") ;;
@@ -77,14 +78,15 @@ while getopts 'hcur:I:l:nTD:d:' arg; do
 		r) passeddir="$OPTARG" ;;
 		I) install_pkgs+=("$OPTARG") ;;
 		l) copy="$OPTARG" ;;
-		n) run_namcap=true; makepkg_args+=('-i') ;;
+		n) run_namcap=true; makepkg_args+=(-i) ;;
 		T) temp_chroot=true; copy+="-$$" ;;
+		h|*) usage ;;
 	esac
 done
 
-check_root "$0" "$@"
-
 [[ ! -f PKGBUILD && -z "${install_pkgs[*]}" ]] && die 'This must be run in a directory containing a PKGBUILD.'
+
+check_root "$0" "${orig_argv[@]}"
 
 # Canonicalize chrootdir, getting rid of trailing /
 chrootdir=$(readlink -e "$passeddir")
@@ -101,7 +103,7 @@ else
 fi
 
 # Pass all arguments after -- right to makepkg
-makepkg_args+=("${@:OPTIND}")
+makepkg_args+=("${@:$OPTIND}")
 
 # See if -R was passed to makepkg
 for arg in "${@:OPTIND}"; do
@@ -114,7 +116,7 @@ for arg in "${@:OPTIND}"; do
 done
 
 if [[ -n $SUDO_USER ]]; then
-	USER_HOME=$(eval echo ~$SUDO_USER)
+	eval "USER_HOME=~$SUDO_USER"
 else
 	USER_HOME=$HOME
 fi
@@ -235,7 +237,13 @@ prepare_chroot() {
 		echo 'SRCDEST="/srcdest"' >> "$copydir/etc/makepkg.conf"
 	fi
 
-	chown -R nobody "$copydir"/{build,pkgdest,srcpkgdest,logdest,srcdest,startdir}
+	builduser_uid=${SUDO_UID:-$UID}
+
+	# We can't use useradd without chrooting, otherwise it invokes PAM modules
+	# which we might not be able to load (i.e. when building i686 packages on
+	# an x86_64 host).
+	printf 'builduser:x:%d:100:builduser:/:/usr/bin/nologin\n' "$builduser_uid" >>"$copydir/etc/passwd"
+	chown -R "$builduser_uid" "$copydir"/{build,pkgdest,srcpkgdest,logdest,srcdest,startdir}
 
 	if [[ -n $MAKEFLAGS ]]; then
 		sed -i '/^MAKEFLAGS=/d' "$copydir/etc/makepkg.conf"
@@ -247,18 +255,33 @@ prepare_chroot() {
 		echo "PACKAGER='${PACKAGER}'" >> "$copydir/etc/makepkg.conf"
 	fi
 
-	if [[ ! -f $copydir/etc/sudoers.d/nobody-pacman ]]; then
-		cat > "$copydir/etc/sudoers.d/nobody-pacman" <<EOF
+	if [[ ! -f $copydir/etc/sudoers.d/builduser-pacman ]]; then
+		cat > "$copydir/etc/sudoers.d/builduser-pacman" <<EOF
 Defaults env_keep += "HOME"
-nobody ALL = NOPASSWD: /usr/bin/pacman
+builduser ALL = NOPASSWD: /usr/bin/pacman
 EOF
-		chmod 440 "$copydir/etc/sudoers.d/nobody-pacman"
+		chmod 440 "$copydir/etc/sudoers.d/builduser-pacman"
 	fi
 
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
-	printf $'#!/bin/bash\n%s\n_chrootbuild %q "$@"' "$(declare -f _chrootbuild)" \
-		"$run_namcap" >"$copydir/chrootbuild"
+	{
+		printf '#!/bin/bash\n'
+		declare -f _chrootbuild
+		printf '_chrootbuild'
+		printf ' %q' "${makepkg_args[@]}"
+		printf ' || exit\n'
+
+		if $run_namcap; then
+			cat <<'EOF'
+pacman -S --needed --noconfirm namcap
+for pkgfile in /startdir/PKGBUILD /pkgdest/*; do
+	echo "Checking ${pkgfile##*/}"
+	sudo -u builduser namcap "$pkgfile" 2>&1 | tee "/logdest/${pkgfile##*/}-namcap.log"
+done
+EOF
+		fi
+	} >"$copydir/chrootbuild"
 	chmod +x "$copydir/chrootbuild"
 }
 
@@ -284,8 +307,6 @@ download_sources() {
 _chrootbuild() {
 	# This function isn't run in makechrootpkg,
 	# so no global variables
-	local run_namcap="$1"; shift
-	local makepkg_args=("$@")
 
 	. /etc/profile
 	export HOME=/build
@@ -303,7 +324,7 @@ _chrootbuild() {
 			for vcsdir in */.$vcs; do
 				rm "${vcsdir%/.$vcs}"
 				cp -a "${dir}_host/${vcsdir%/.$vcs}" .
-				chown -R nobody "${vcsdir%/.$vcs}"
+				chown -R builduser "${vcsdir%/.$vcs}"
 			done
 		done
 	done
@@ -313,7 +334,7 @@ _chrootbuild() {
 	# XXX: Keep PKGBUILD writable for pkgver()
 	rm PKGBUILD*
 	cp /startdir_host/PKGBUILD* .
-	chown nobody PKGBUILD*
+	chown builduser PKGBUILD*
 
 	# Safety check
 	if [[ ! -w PKGBUILD ]]; then
@@ -321,17 +342,7 @@ _chrootbuild() {
 		exit 1
 	fi
 
-	sudo -u nobody makepkg "${makepkg_args[@]}" || exit 1
-
-	if $run_namcap; then
-		pacman -S --needed --noconfirm namcap
-		for pkgfile in /startdir/PKGBUILD /pkgdest/*; do
-			echo "Checking ${pkgfile##*/}"
-			sudo -u nobody namcap "$pkgfile" 2>&1 | tee "/logdest/${pkgfile##*/}-namcap.log"
-		done
-	fi
-
-	exit 0
+	sudo -u builduser makepkg "$@"
 }
 
 move_products() {
