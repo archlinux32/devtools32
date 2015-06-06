@@ -393,7 +393,7 @@ if arch-nspawn "$copydir" \
 	--bind-ro="$PWD:/startdir_host" \
 	--bind-ro="$SRCDEST:/srcdest_host" \
 	"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
-	/chrootbuild "${makepkg_args[@]}"
+	/chrootbuild
 then
 	move_products
 else
