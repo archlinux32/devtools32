@@ -19,7 +19,7 @@ files=()
 
 usage() {
 	echo "Usage: ${0##*/} [options] working-dir [systemd-nspawn arguments]"
-	echo "A wrapper around systemd-nspawn. Provides support for pacman."
+	echo "A wrapper around systemd-nspawn.  Provides support for pacman."
 	echo
 	echo ' options:'
 	echo '    -C <file>     Location of a pacman config file'
@@ -101,7 +101,7 @@ umask 0022
 if [[ ! -f "$working_dir/.arch-chroot" ]]; then
 	die "'%s' does not appear to be an Arch chroot." "$working_dir"
 elif [[ $(cat "$working_dir/.arch-chroot") != "$CHROOT_VERSION" ]]; then
-	die "chroot '%s' is not at version %s. Please rebuild." "$working_dir" "$CHROOT_VERSION"
+	die "chroot '%s' is not at version %s.  Please rebuild." "$working_dir" "$CHROOT_VERSION"
 fi
 
 build_mount_args
