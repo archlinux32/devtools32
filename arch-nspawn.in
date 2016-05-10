@@ -108,6 +108,9 @@ build_mount_args
 copy_hostconf
 
 eval "$(grep -a '^CARCH=' "$working_dir/etc/makepkg.conf")"
+case "$CARCH" in
+	armv7h) CARCH=armv7l;;
+esac
 
 [[ -z $nosetarch ]] || unset CARCH
 
