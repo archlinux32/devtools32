@@ -80,6 +80,95 @@ load_vars() {
 	return 0
 }
 
+# Usage: btrfs_subvolume_id $SUBVOLUME
+btrfs_subvolume_id() (
+	set -o pipefail
+	LC_ALL=C btrfs subvolume show "$1" | sed -n 's/^\tSubvolume ID:\s*//p'
+)
+
+# Usage: btrfs_subvolume_list_all $FILEPATH
+#
+# Given $FILEPATH somewhere on a mounted btrfs filesystem, print the
+# ID and full path of every subvolume on the filesystem, one per line
+# in the format "$ID $PATH", where $PATH is relative to the top-level
+# subvolume (which might not be what is mounted).
+#
+# BUG: Due to limitations in the `btrfs` tool, this will not correctly
+# list subvolumes whose path contains a space.
+btrfs_subvolume_list_all() (
+	set -o pipefail
+
+	local mountpoint all
+	mountpoint="$(df --output=target "$1" | sed 1d)" || return
+	# The output of `btrfs subvolume list -a` is a space-separated
+	# sequence of "key value key value...".  Unfortunately both
+	# keys and values can contain space, and there's no escaping
+	# or indication of when this happens.  So we assume
+	#  1. ID is the first column
+	#  2. That no key or value will contain " path"
+	#  3. That the "path" value does not contain a space.
+	all="$(LC_ALL=C btrfs subvolume list -a "$mountpoint" | sed -r 's|^ID ([0-9]+) .* path (<FS_TREE>/)?(\S*).*|\1 \3|')" || return
+
+	# Sanity check the output
+	local id path
+	while read -r id path; do
+		# ID should be numeric
+		[[ "$id" =~ ^-?[0-9]+$ ]] || return
+		# While a path could countain a space, the above code
+		# doesn't support it; if there is space, then it means
+		# we got a line not matching the expected format.
+		[[ "$path" != *' '* ]] || return
+	done <<<"$all"
+
+	printf '%s\n' "$all"
+)
+
+# Usage: btrfs_subvolume_list $SUBVOLUME
+#
+# Assuming that $SUBVOLUME is a btrfs subvolume, list all child
+# subvolumes; from most deeply nested to most shallowly nested.
+#
+# This is intended to be a sane version of `btrfs subvolume list`.
+btrfs_subvolume_list() {
+	local subvolume=$1
+
+	local id all path subpath
+	id="$(btrfs_subvolume_id "$subvolume")" || return
+	all="$(btrfs_subvolume_list_all "$subvolume")" || return
+	path=$(awk -v id="$id" '$1 == id { sub($1 FS, ""); print }' <<<"$all")
+	while read -r id subpath; do
+		if [[ "$subpath" = "$path"/* ]]; then
+			printf '%s\n' "${subpath#"${path}/"}"
+		fi
+	done <<<"$all" | LC_ALL=C sort --reverse
+}
+
+# Usage: btrfs_subvolume_delete $SUBVOLUME
+#
+# Assuming that $SUBVOLUME is a btrfs subvolume, delete it and all
+# subvolumes below it.
+#
+# This is intended to be a recursive version of
+# `btrfs subvolume delete`.
+btrfs_subvolume_delete() {
+	local dir="$1"
+
+	# We store the result as a variable because we want to see if
+	# btrfs_subvolume_list fails or succeeds before we start
+	# deleting things.  (Then we have to work around the subshell
+	# trimming the trailing newlines.)
+	local subvolumes
+	subvolumes="$(btrfs_subvolume_list "$dir")" || return
+	[[ -z "$subvolumes" ]] || subvolumes+=$'\n'
+
+	local subvolume
+	while read -r subvolume; do
+		btrfs subvolume delete "$dir/$subvolume" || return
+	done < <(printf '%s' "$subvolumes")
+
+	btrfs subvolume delete "$dir"
+}
+
 create_chroot() {
 	# Lock the chroot we want to use. We'll keep this lock until we exit.
 	lock 9 "$copydir.lock" "Locking chroot copy [%s]" "$copy"
@@ -92,7 +181,7 @@ create_chroot() {
 		stat_busy "Creating clean working copy [%s]" "$copy"
 		if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
 			if [[ -d $copydir ]]; then
-				btrfs subvolume delete "$copydir" >/dev/null ||
+				btrfs_subvolume_delete "$copydir" >/dev/null ||
 					die "Unable to delete subvolume %s" "$copydir"
 			fi
 			btrfs subvolume snapshot "$chrootdir/root" "$copydir" >/dev/null ||
@@ -114,7 +203,7 @@ create_chroot() {
 clean_temporary() {
 	stat_busy "Removing temporary copy [%s]" "$copy"
 	if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
-		btrfs subvolume delete "$copydir" >/dev/null ||
+		btrfs_subvolume_delete "$copydir" >/dev/null ||
 			die "Unable to delete subvolume %s" "$copydir"
 	else
 		# avoid change of filesystem in case of an umount failure
