@@ -12,7 +12,8 @@ m4_include(lib/common.sh)
 
 shopt -s nullglob
 
-makepkg_args=(-s --noconfirm -L --holdver)
+default_makepkg_args=(-s --noconfirm -L --holdver)
+makepkg_args=("${default_makepkg_args[@]}")
 repack=false
 update_first=false
 clean_first=false
@@ -46,7 +47,7 @@ usage() {
 	echo 'command:'
 	echo '    mkarchroot <chrootdir>/root base-devel'
 	echo ''
-	echo "Default makepkg args: ${makepkg_args[*]}"
+	echo "Default makepkg args: ${default_makepkg_args[*]}"
 	echo ''
 	echo 'Flags:'
 	echo '-h         This help'
