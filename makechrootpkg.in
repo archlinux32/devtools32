@@ -144,9 +144,10 @@ create_chroot() {
 	if [[ ! -d $copydir ]] || $clean_first; then
 		# Get a read lock on the root chroot to make
 		# sure we don't clone a half-updated chroot
-		slock 8 "$chrootdir/root.lock" "Locking clean chroot"
+		slock 8 "$chrootdir/root.lock" \
+			"Locking clean chroot [%s]" "$chrootdir/root"
 
-		stat_busy "Creating clean working copy [%s]" "$copy"
+		stat_busy "Synchronizing chroot copy [%s] -> [%s]" "$chrootdir/root" "$copydir"
 		if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
 			if [[ -d $copydir ]]; then
 				btrfs_subvolume_delete "$copydir" >/dev/null ||
@@ -169,7 +170,7 @@ create_chroot() {
 }
 
 clean_temporary() {
-	stat_busy "Removing temporary copy [%s]" "$copy"
+	stat_busy "Removing chroot copy [%s]" "$copydir"
 	if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
 		btrfs_subvolume_delete "$copydir" >/dev/null ||
 			die "Unable to delete subvolume %s" "$copydir"
