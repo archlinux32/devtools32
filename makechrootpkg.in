@@ -308,6 +308,15 @@ EOF
 		chmod 440 "$copydir/etc/sudoers.d/builduser-pacman"
 	fi
 
+	if ! grep -q '^\[repo\]' "$copydir/etc/pacman.conf"; then
+		local line=$(grep -n '^\[' "$copydir/etc/pacman.conf" |grep -Fv ':[options]'|sed 's/:.*//;1q')
+		local ins='[repo]
+SigLevel = Optional TrustAll
+Server = file:///repo
+'
+		sed -i "${line}i${ins//$'\n'/\\n}" "$copydir/etc/pacman.conf"
+	fi
+
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
 	{
@@ -399,6 +408,8 @@ _chrootprepare() {
 		exit 1
 	fi
 
+	# Sync deps now, as networking may be disabled during _chrootbuild
+	cp /repo/repo.db /var/lib/pacman/sync/repo.db
 	sudo -u builduser makepkg "$@" --nobuild
 }
 
