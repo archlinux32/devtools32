@@ -1,6 +1,9 @@
 #!/hint/bash
 # This may be included with or without `set -euE`
 
+# This file is included by libremessages.
+# You should probably use libremessages instead of this.
+
 # License: Unspecified
 
 [[ -z ${_INCLUDE_COMMON_SH:-} ]] || return 0
