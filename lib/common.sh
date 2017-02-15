@@ -1,6 +1,8 @@
 #!/hint/bash
 # This may be included with or without `set -euE`
 
+# License: Unspecified
+
 # Avoid any encoding problems
 export LANG=C
 
