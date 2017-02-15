@@ -227,6 +227,12 @@ EOF
 	# working copy
 	{
 		printf '#!/bin/bash\n'
+		declare -f _chrootprepare
+		printf '_chrootprepare "$@"\n'
+	} > "$copydir/chrootprepare"
+	chmod +x "$copydir/chrootprepare"
+	{
+		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
 		printf '_chrootbuild "$@" || exit\n'
 
@@ -240,10 +246,16 @@ EOF
 
 # These functions aren't run in makechrootpkg,
 # so no global variables
+_chrootprepare() {
+	# shellcheck source=/dev/null
+	. /etc/profile
+	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@" --nobuild' -bash "$@"
+}
+
 _chrootbuild() {
 	# shellcheck source=/dev/null
 	. /etc/profile
-	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@"' -bash "$@"
+	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@" --noextract --noprepare' -bash "$@"
 }
 
 _chrootnamcap() {
@@ -402,6 +414,11 @@ main() {
 	prepare_chroot "$copydir" "$USER_HOME" "$repack"
 
 	if arch-nspawn "$copydir" \
+		--bind="$PWD:/startdir" \
+		--bind="$SRCDEST:/srcdest" \
+		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+		/chrootprepare "${makepkg_args[@]}" &&
+	   arch-nspawn "$copydir" \
 		--bind="$PWD:/startdir" \
 		--bind="$SRCDEST:/srcdest" \
 		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
