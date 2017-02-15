@@ -4,17 +4,23 @@
 #
 # License: Unspecified
 
-m4_include(lib/common.sh)
+. "$(librelib messages)"
 
 match=$1
 
+usage() {
+	print 'Usage: %s <depname>' "${0##*/}"
+	print 'Find packages that depend on a given depname.'
+	echo
+	prose 'Run this script from the top-level directory of your ABS tree.'
+}
 if [[ -z $match ]]; then
-	echo 'Usage: finddeps <depname>'
-	echo ''
-	echo 'Find packages that depend on a given depname.'
-	echo 'Run this script from the top-level directory of your ABS tree.'
-	echo ''
+	usage >&2
 	exit 1
+fi
+if [[ $match = '-h' ]]; then
+	usage
+	exit 0
 fi
 
 find . -type d | while read -r d; do
