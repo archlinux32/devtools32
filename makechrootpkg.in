@@ -200,6 +200,12 @@ EOF
 	# working copy
 	{
 		printf '#!/bin/bash\n'
+		declare -f _chrootprepare
+		printf '_chrootprepare "$@"\n'
+	} > "$copydir/chrootprepare"
+	chmod +x "$copydir/chrootprepare"
+	{
+		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
 		declare -p SOURCE_DATE_EPOCH 2>/dev/null || true
 		printf '_chrootbuild "$@" || exit\n'
@@ -214,6 +220,20 @@ EOF
 
 # These functions aren't run in makechrootpkg,
 # so no global variables
+_chrootprepare() {
+	# No coredumps
+	ulimit -c 0
+
+	# shellcheck source=/dev/null
+	. /etc/profile
+
+	# Beware, there are some stupid arbitrary rules on how you can
+	# use "$" in arguments to commands with "sudo -i".  ${foo} or
+	# ${1} is OK, but $foo or $1 isn't.
+	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
+	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@" --nobuild' -bash "$@"
+}
+
 _chrootbuild() {
 	# No coredumps
 	ulimit -c 0
@@ -225,7 +245,7 @@ _chrootbuild() {
 	# use "$" in arguments to commands with "sudo -i".  ${foo} or
 	# ${1} is OK, but $foo or $1 isn't.
 	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
-	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@"' -bash "$@"
+	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@" --noextract --noprepare' -bash "$@"
 }
 
 _chrootnamcap() {
@@ -409,6 +429,11 @@ main() {
 	prepare_chroot "$copydir" "$USER_HOME" "$keepbuilddir" "$run_namcap"
 
 	if arch-nspawn "$copydir" \
+		--bind="$PWD:/startdir" \
+		--bind="$SRCDEST:/srcdest" \
+		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+		/chrootprepare "${makepkg_args[@]}" &&
+	   arch-nspawn "$copydir" \
 		--bind="$PWD:/startdir" \
 		--bind="$SRCDEST:/srcdest" \
 		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
