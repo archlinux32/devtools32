@@ -312,6 +312,12 @@ EOF
 	# working copy
 	{
 		printf '#!/bin/bash\n'
+		declare -f _chrootprepare
+		printf '_chrootprepare "$@"\n'
+	} > "$copydir/chrootprepare"
+	chmod +x "$copydir/chrootprepare"
+	{
+		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
 		printf '_chrootbuild "$@" || exit\n'
 
@@ -354,7 +360,7 @@ download_sources() {
 	rm -rf "$builddir"
 }
 
-_chrootbuild() {
+_chrootprepare() {
 	# This function isn't run in makechrootpkg,
 	# so no global variables
 
@@ -392,7 +398,20 @@ _chrootbuild() {
 		exit 1
 	fi
 
-	sudo -u builduser makepkg "$@"
+	sudo -u builduser makepkg "$@" --nobuild
+}
+
+_chrootbuild() {
+	# This function isn't run in makechrootpkg,
+	# so no global variables
+
+	. /etc/profile
+	export HOME=/build
+	shopt -s nullglob
+
+	cd /startdir
+
+	sudo -u builduser makepkg "$@" --noextract --noprepare
 }
 
 # Usage: move_products $copydir $owner
@@ -508,6 +527,11 @@ download_sources "$copydir" "$src_owner"
 prepare_chroot "$copydir" "$USER_HOME" "$repack"
 
 if arch-nspawn "$copydir" \
+	--bind-ro="$PWD:/startdir_host" \
+	--bind-ro="$SRCDEST:/srcdest_host" \
+	"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+	/chrootprepare "${makepkg_args[@]}" &&
+   arch-nspawn "$copydir" \
 	--bind-ro="$PWD:/startdir_host" \
 	--bind-ro="$SRCDEST:/srcdest_host" \
 	"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
