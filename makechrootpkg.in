@@ -427,6 +427,9 @@ move_products() {
 	for pkgfile in "$copydir"/pkgdest/*; do
 		chown "$src_owner" "$pkgfile"
 		mv "$pkgfile" "$PKGDEST"
+		if [[ $PKGDEST != $PWD ]]; then
+			ln -sf "$PKGDEST/${pkgfile##*/}" .
+		fi
 	done
 
 	local l
