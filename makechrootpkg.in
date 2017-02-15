@@ -201,6 +201,19 @@ builduser ALL = NOPASSWD: /usr/bin/pacman
 EOF
 	chmod 440 "$copydir/etc/sudoers.d/builduser-pacman"
 
+	if ! grep -q '^\[repo\]' "$copydir/etc/pacman.conf"; then
+		local line
+		line=$(grep -n '^\[' "$copydir/etc/pacman.conf" |grep -Fv ':[options]'|sed 's/:.*//;1q')
+		local ins='[repo]
+SigLevel = Optional TrustAll
+Server = file:///repo
+'
+		sed -i "${line}i${ins//$'\n'/\\n}" "$copydir/etc/pacman.conf"
+	fi
+	# Avoid having to use `pacman -Sy` to update [repo], as
+	# networking might be disabled inside of the chroot.
+	cp "$copydir/repo/repo.db" "$copydir/var/lib/pacman/sync/repo.db"
+
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
 	{
