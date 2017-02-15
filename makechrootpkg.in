@@ -146,8 +146,6 @@ btrfs_subvolume_delete() {
 }
 
 # Usage: sync_chroot $CHROOTDIR/$CHROOT <$CHROOTCOPY|$copydir>
-# Globals:
-#  - chroottype
 sync_chroot() {
 	local chrootdir=$1
 	local copy=$2
@@ -162,6 +160,9 @@ sync_chroot() {
 		error 'Cannot sync copy with itself: %s' "$copydir"
 		return 1
 	fi
+
+	# Detect chrootdir filesystem type
+	local chroottype=$(stat -f -c %T "$chrootdir")
 
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
@@ -190,10 +191,10 @@ sync_chroot() {
 }
 
 # Usage: delete_chroot $copydir
-# Globals:
-#  - chroottype
 delete_chroot() {
 	local copydir=$1
+	# Detect chrootdir filesystem type
+	local chroottype=$(stat -f -c %T "$copydir")
 
 	stat_busy "Removing chroot copy [%s]" "$copydir"
 	if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
@@ -447,9 +448,6 @@ check_root "$0" "${orig_argv[@]}"
 chrootdir=$(readlink -e "$passeddir")
 [[ ! -d $chrootdir ]] && die "No chroot dir defined, or invalid path '%s'" "$passeddir"
 [[ ! -d $chrootdir/root ]] && die "Missing chroot dir root directory. Try using: mkarchroot %s/root base-devel" "$chrootdir"
-
-# Detect chrootdir filesystem type
-chroottype=$(stat -f -c %T "$chrootdir")
 
 if [[ ${copy:0:1} = / ]]; then
 	copydir=$copy
