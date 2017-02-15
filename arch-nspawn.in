@@ -105,6 +105,7 @@ elif [[ $(cat "$working_dir/.arch-chroot") != "$CHROOT_VERSION" ]]; then
 fi
 
 build_mount_args
+cache_dirs+=('/repo/')
 copy_hostconf
 
 eval "$(grep -a '^CARCH=' "$working_dir/etc/makepkg.conf")"
