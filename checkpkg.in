@@ -3,7 +3,28 @@
 
 shopt -s extglob
 
-m4_include(lib/common.sh)
+. "$(librelib messages)"
+
+usage() {
+	print 'Usage: %s [-h]' "${0##*/}"
+	print 'Compare a locally built a package with the one in the repositories.'
+	echo
+	prose 'This should be run from a directory containing a
+	       PKGBUILD.  It searches for a locally built package
+	       corresponding to the PKGBUILD, and downloads the last
+	       version of that package from the pacman repositories.
+	       It then compares the list of .so files provided by each
+	       version of the package.  It does this for each part of
+	       a split package.'
+}
+
+if [[ $1 = '-h' ]]; then
+	usage
+	exit 0
+elif [[ $# -gt 0 ]]; then
+	usage >&2
+	exit 1
+fi
 
 # Source makepkg.conf; fail if it is not found
 if [[ -r '/etc/makepkg.conf' ]]; then
@@ -23,7 +44,9 @@ elif [[ -r "$HOME/.makepkg.conf" ]]; then
 fi
 
 if [[ ! -f PKGBUILD ]]; then
-	die 'This must be run in the directory of a built package.'
+	error 'This must be run in the directory of a built package.'
+	usage >&2
+	exit 1
 fi
 
 # shellcheck source=/dev/null
