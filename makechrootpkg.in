@@ -369,6 +369,7 @@ _chrootprepare() {
 	shopt -s nullglob
 
 	# XXX: Workaround makepkg disliking read-only dirs
+	rm -rf -- /srcdest/* /startdir/*
 	ln -sft /srcdest /srcdest_host/*
 	ln -sft /startdir /startdir_host/*
 
