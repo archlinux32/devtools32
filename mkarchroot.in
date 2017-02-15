@@ -16,23 +16,29 @@ CHROOT_VERSION='v3'
 
 working_dir=''
 
+files=()
+
 usage() {
 	echo "Usage: ${0##*/} [options] working-dir package-list..."
 	echo ' options:'
 	echo '    -C <file>     Location of a pacman config file'
 	echo '    -M <file>     Location of a makepkg config file'
 	echo '    -c <dir>      Set pacman cache'
+	echo '    -f <file>     Copy file from the host to the chroot'
+	echo '    -s            Do not run setarch'
 	echo '    -h            This message'
 	exit 1
 }
 
 orig_argv=("$@")
 
-while getopts 'hC:M:c:' arg; do
+while getopts 'hC:M:c:f:s' arg; do
 	case "$arg" in
 		C) pac_conf="$OPTARG" ;;
 		M) makepkg_conf="$OPTARG" ;;
 		c) cache_dir="$OPTARG" ;;
+		f) files+=("$OPTARG") ;;
+		s) nosetarch=1 ;;
 		h|?) usage ;;
 		*) error "invalid argument '%s'" "$arg"; usage ;;
 	esac
@@ -70,6 +76,16 @@ if [[ $(stat -f -c %T "$working_dir") == btrfs ]]; then
 	chmod 0755 "$working_dir"
 fi
 
+for file in "${files[@]}"; do
+	mkdir -p "$(dirname "$working_dir$file")"
+	cp "$file" "$working_dir$file"
+done
+
+_env=()
+while read -r varname; do
+	_env+=("$varname=${!varname}")
+done < <(declare -x | sed -r 's/^declare -x ([^=]*)=.*/\1/' | grep -i '_proxy$')
+env -i "${_env[@]}" \
 pacstrap -GMcd ${pac_conf:+-C "$pac_conf"} "$working_dir" \
   "${cache_dirs[@]/#/--cachedir=}" "$@" || die 'Failed to install all packages'
 
@@ -79,7 +95,8 @@ echo "$CHROOT_VERSION" > "$working_dir/.arch-chroot"
 
 systemd-machine-id-setup --root="$working_dir"
 
-exec arch-nspawn \
+exec "$(librelib chroot/arch-nspawn)" \
+	${nosetarch:+-s} \
 	${pac_conf:+-C "$pac_conf"} \
 	${makepkg_conf:+-M "$makepkg_conf"} \
 	${cache_dir:+-c "$cache_dir"} \

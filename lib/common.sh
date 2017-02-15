@@ -1,7 +1,28 @@
+#!/hint/bash
+# This may be included with or without `set -euE`
+
+# This file is included by libremessages.
+# You should probably use libremessages instead of this.
+
 # License: Unspecified
 
-# Avoid any encoding problems
-export LANG=C
+shopt -s extglob
+
+if [[ -z ${_INCLUDE_COMMON_SH:-} ]]; then
+_INCLUDE_COMMON_SH=true
+
+[[ -n ${TEXTDOMAIN:-}    ]] || export TEXTDOMAIN='libretools'
+[[ -n ${TEXTDOMAINDIR:-} ]] || export TEXTDOMAINDIR='/usr/share/locale'
+
+if type gettext &>/dev/null; then
+	_() { gettext "$@"; }
+else
+	_() { echo "$@"; }
+fi
+
+_l() {
+	TEXTDOMAIN='librelib' TEXTDOMAINDIR='/usr/share/locale' "$@"
+}
 
 shopt -s extglob
 
@@ -28,37 +49,37 @@ fi
 readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 
 plain() {
-	local mesg=$1; shift
+	local mesg="$(_ "$1")"; shift
 	printf "${BOLD}    ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg() {
-	local mesg=$1; shift
+	local mesg="$(_ "$1")"; shift
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg2() {
-	local mesg=$1; shift
+	local mesg="$(_ "$1")"; shift
 	printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 warning() {
-	local mesg=$1; shift
-	printf "${YELLOW}==> $(gettext "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	local mesg="$(_ "$1")"; shift
+	printf "${YELLOW}==> $(_l _ "WARNING:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 error() {
-	local mesg=$1; shift
-	printf "${RED}==> $(gettext "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+	local mesg="$(_ "$1")"; shift
+	printf "${RED}==> $(_l _ "ERROR:")${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 stat_busy() {
-	local mesg=$1; shift
+	local mesg="$(_ "$1")"; shift
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
-	printf "${BOLD}$(gettext "done")${ALL_OFF}\n" >&2
+	printf "${BOLD}$(_l _ "done")${ALL_OFF}\n" >&2
 }
 
 _setup_workdir=false
@@ -77,7 +98,7 @@ cleanup() {
 }
 
 abort() {
-	error 'Aborting...'
+	_l error 'Aborting...'
 	cleanup 255
 }
 
@@ -142,7 +163,8 @@ get_full_version() {
 ##
 #  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-lock() {
+lock()
+{
 	local fd=$1
 	local file=$2
 	local mesg=("${@:3}")
@@ -163,7 +185,8 @@ lock() {
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-slock() {
+slock()
+{
 	local fd=$1
 	local file=$2
 	local mesg=("${@:3}")
@@ -255,7 +278,7 @@ find_cached_package() {
 			return 0
 			;;
 		*)
-			error 'Multiple packages found:'
+			_l error 'Multiple packages found:'
 			printf '\t%s\n' "${results[@]}" >&2
 			return 1
 	esac
@@ -272,3 +295,5 @@ check_root() {
 		exec su root -c "$(printf ' %q' "$@")"
 	fi
 }
+
+fi

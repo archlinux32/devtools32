@@ -14,6 +14,7 @@ m4_include(lib/common.sh)
 
 shopt -s nullglob
 
+init_variables() {
 default_makepkg_args=(-s --noconfirm -L --holdver)
 makepkg_args=("${default_makepkg_args[@]}")
 repack=false
@@ -31,9 +32,10 @@ bindmounts_ro=()
 bindmounts_rw=()
 
 copy=$USER
-[[ -n $SUDO_USER ]] && copy=$SUDO_USER
+[[ -n ${SUDO_USER:-} ]] && copy=$SUDO_USER
 [[ -z "$copy" || $copy = root ]] && copy=copy
 src_owner=${SUDO_USER:-$USER}
+}
 
 usage() {
 	echo "Usage: ${0##*/} [options] -r <chrootdir> [--] [makepkg args]"
@@ -70,13 +72,21 @@ usage() {
 }
 
 # {{{ functions
+# Usage: load_vars $makepkg_conf
+# Globals:
+#  - SRCDEST
+#  - SRCPKGDEST
+#  - PKGDEST
+#  - LOGDEST
+#  - MAKEFLAGS
+#  - PACKAGER
 load_vars() {
 	local makepkg_conf="$1" var
 
 	[[ -f $makepkg_conf ]] || return 1
 
 	for var in {SRC,SRCPKG,PKG,LOG}DEST MAKEFLAGS PACKAGER; do
-		[[ -z ${!var} ]] && eval $(grep "^${var}=" "$makepkg_conf")
+		[[ -z ${!var:-} ]] && eval $(grep "^${var}=" "$makepkg_conf")
 	done
 
 	return 0
@@ -137,16 +147,31 @@ btrfs_subvolume_delete() {
 	btrfs subvolume delete "$dir"
 }
 
-create_chroot() {
-	# Lock the chroot we want to use. We'll keep this lock until we exit.
-	lock 9 "$copydir.lock" "Locking chroot copy [%s]" "$copy"
+# Usage: sync_chroot $CHROOTDIR/$CHROOT <$CHROOTCOPY|$copydir>
+sync_chroot() {
+	local chrootdir=$1
+	local copy=$2
+	local copydir=''
+	if [[ ${copy:0:1} = / ]]; then
+		copydir=$copy
+	else
+		copydir="$chrootdir/$copy"
+	fi
 
-	if [[ ! -d $copydir ]] || $clean_first; then
+	if [[ "$chrootdir/root" -ef "$copydir" ]]; then
+		error 'Cannot sync copy with itself: %s' "$copydir"
+		return 1
+	fi
+
+	# Detect chrootdir filesystem type
+	local chroottype=$(stat -f -c %T "$chrootdir")
+
 		# Get a read lock on the root chroot to make
 		# sure we don't clone a half-updated chroot
-		slock 8 "$chrootdir/root.lock" "Locking clean chroot"
+		slock 8 "$chrootdir/root.lock" \
+			"Locking clean chroot [%s]" "$chrootdir/root"
 
-		stat_busy "Creating clean working copy [%s]" "$copy"
+		stat_busy "Synchronizing chroot copy [%s] -> [%s]" "$chrootdir/root" "$copydir"
 		if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
 			if [[ -d $copydir ]]; then
 				btrfs_subvolume_delete "$copydir" >/dev/null ||
@@ -162,14 +187,18 @@ create_chroot() {
 
 		# Drop the read lock again
 		lock_close 8
-	fi
 
 	# Update mtime
 	touch "$copydir"
 }
 
-clean_temporary() {
-	stat_busy "Removing temporary copy [%s]" "$copy"
+# Usage: delete_chroot $copydir
+delete_chroot() {
+	local copydir=$1
+	# Detect chrootdir filesystem type
+	local chroottype=$(stat -f -c %T "$copydir")
+
+	stat_busy "Removing chroot copy [%s]" "$copydir"
 	if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
 		btrfs_subvolume_delete "$copydir" >/dev/null ||
 			die "Unable to delete subvolume %s" "$copydir"
@@ -184,9 +213,14 @@ clean_temporary() {
 	stat_done
 }
 
+# Usage: install_packages $copydir $pkgs...
 install_packages() {
+	local copydir=$1
+	local install_pkgs=("${@:2}")
+	declare -i ret=0
 	local pkgname
 
+	local install_pkg
 	for install_pkg in "${install_pkgs[@]}"; do
 		pkgname="${install_pkg##*/}"
 		cp "$install_pkg" "$copydir/$pkgname"
@@ -199,11 +233,19 @@ install_packages() {
 		rm "$copydir/$pkgname"
 	done
 
-	# If there is no PKGBUILD we are done
-	[[ -f PKGBUILD ]] || exit $ret
+	return $ret
 }
 
+# Usage: prepare_chroot $copydir $HOME $repack $run_namcap
+# Globals:
+#  - MAKEFLAGS
+#  - PACKAGER
 prepare_chroot() {
+	local copydir=$1
+	local USER_HOME=$2
+	local repack=$3
+	local run_namcap=$4
+
 	$repack || rm -rf "$copydir/build"
 
 	mkdir -p "$copydir/build"
@@ -250,12 +292,12 @@ prepare_chroot() {
 	printf 'builduser:x:%d:100:builduser:/build:/bin/bash\n' "$builduser_uid" >>"$copydir/etc/passwd"
 	chown -R "$builduser_uid" "$copydir"/{build,pkgdest,srcpkgdest,logdest,srcdest,startdir}
 
-	if [[ -n $MAKEFLAGS ]]; then
+	if [[ -n ${MAKEFLAGS:-} ]]; then
 		sed -i '/^MAKEFLAGS=/d' "$copydir/etc/makepkg.conf"
 		echo "MAKEFLAGS='${MAKEFLAGS}'" >> "$copydir/etc/makepkg.conf"
 	fi
 
-	if [[ -n $PACKAGER ]]; then
+	if [[ -n ${PACKAGER:-} ]]; then
 		sed -i '/^PACKAGER=/d' "$copydir/etc/makepkg.conf"
 		echo "PACKAGER='${PACKAGER}'" >> "$copydir/etc/makepkg.conf"
 	fi
@@ -268,8 +310,23 @@ EOF
 		chmod 440 "$copydir/etc/sudoers.d/builduser-pacman"
 	fi
 
+	if ! grep -q '^\[repo\]' "$copydir/etc/pacman.conf"; then
+		local line=$(grep -n '^\[' "$copydir/etc/pacman.conf" |grep -Fv ':[options]'|sed 's/:.*//;1q')
+		local ins='[repo]
+SigLevel = Optional TrustAll
+Server = file:///repo
+'
+		sed -i "${line}i${ins//$'\n'/\\n}" "$copydir/etc/pacman.conf"
+	fi
+
 	# This is a little gross, but this way the script is recreated every time in the
 	# working copy
+	{
+		printf '#!/bin/bash\n'
+		declare -f _chrootprepare
+		printf '_chrootprepare "$@"\n'
+	} > "$copydir/chrootprepare"
+	chmod +x "$copydir/chrootprepare"
 	{
 		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
@@ -288,13 +345,19 @@ EOF
 	chmod +x "$copydir/chrootbuild"
 }
 
+# Usage: download_sources $copydir $src_owner
+# Globals:
+#  - SRCDEST
 download_sources() {
+	local copydir=$1
+	local src_owner=$2
+
 	local builddir="$(mktemp -d)"
 	chmod 1777 "$builddir"
 
 	# Ensure sources are downloaded
-	if [[ -n $SUDO_USER ]]; then
-		sudo -u $SUDO_USER env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
+	if [[ $USER != $src_owner ]]; then
+		sudo -u $src_owner env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
 			makepkg --config="$copydir/etc/makepkg.conf" --verifysource -o
 	else
 		( export SRCDEST BUILDDIR="$builddir"
@@ -304,10 +367,10 @@ download_sources() {
 	(( $? != 0 )) && die "Could not download sources."
 
 	# Clean up garbage from verifysource
-	rm -rf $builddir
+	rm -rf "$builddir"
 }
 
-_chrootbuild() {
+_chrootprepare() {
 	# This function isn't run in makechrootpkg,
 	# so no global variables
 
@@ -316,6 +379,7 @@ _chrootbuild() {
 	shopt -s nullglob
 
 	# XXX: Workaround makepkg disliking read-only dirs
+	rm -rf -- /srcdest/* /startdir/*
 	ln -sft /srcdest /srcdest_host/*
 	ln -sft /startdir /startdir_host/*
 
@@ -345,15 +409,42 @@ _chrootbuild() {
 		exit 1
 	fi
 
-	sudo -u builduser makepkg "$@"
+	# Sync deps now, as networking may be disabled during _chrootbuild
+	cp /repo/repo.db /var/lib/pacman/sync/repo.db
+	sudo -u builduser makepkg "$@" --nobuild
 }
 
+_chrootbuild() {
+	# This function isn't run in makechrootpkg,
+	# so no global variables
+
+	. /etc/profile
+	export HOME=/build
+	shopt -s nullglob
+
+	cd /startdir
+
+	sudo -u builduser makepkg "$@" --noextract --noprepare
+}
+
+# Usage: move_products $copydir $owner
+# Globals:
+#  - PKGDEST
+#  - LOGDEST
 move_products() {
+	local copydir=$1
+	local src_owner=$2
+
+	local pkgfile
 	for pkgfile in "$copydir"/pkgdest/*; do
 		chown "$src_owner" "$pkgfile"
 		mv "$pkgfile" "$PKGDEST"
+		if [[ $PKGDEST != $PWD ]]; then
+			ln -sf "$PKGDEST/${pkgfile##*/}" .
+		fi
 	done
 
+	local l
 	for l in "$copydir"/logdest/*; do
 		[[ $l == */logpipe.* ]] && continue
 		chown "$src_owner" "$l"
@@ -366,6 +457,9 @@ move_products() {
 	done
 }
 # }}}
+
+main() {
+init_variables
 
 orig_argv=("$@")
 
@@ -432,30 +526,45 @@ load_vars /etc/makepkg.conf
 [[ -d $SRCPKGDEST ]] || SRCPKGDEST=$PWD
 [[ -d $LOGDEST ]]    || LOGDEST=$PWD
 
-create_chroot
+# Lock the chroot we want to use. We'll keep this lock until we exit.
+lock 9 "$copydir.lock" "Locking chroot copy [%s]" "$copy"
+
+if [[ ! -d $copydir ]] || $clean_first; then
+	sync_chroot "$chrootdir" "$copy"
+fi
 
 $update_first && arch-nspawn "$copydir" \
 		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
 		pacman -Syu --noconfirm
 
-[[ -n ${install_pkgs[*]} ]] && install_packages
+if [[ -n ${install_pkgs[*]:-} ]]; then
+	install_packages "$copydir" "${install_pkgs[@]}"
+	ret=$?
+	# If there is no PKGBUILD we have done
+	[[ -f PKGBUILD ]] || exit $ret
+fi
 
-download_sources
+download_sources "$copydir" "$src_owner"
 
-prepare_chroot
+prepare_chroot "$copydir" "$USER_HOME" "$repack"
 
 if arch-nspawn "$copydir" \
 	--bind-ro="$PWD:/startdir_host" \
 	--bind-ro="$SRCDEST:/srcdest_host" \
 	"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+	/chrootprepare "${makepkg_args[@]}" &&
+   arch-nspawn "$copydir" \
+	--bind-ro="$PWD:/startdir_host" \
+	--bind-ro="$SRCDEST:/srcdest_host" \
+	"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
 	/chrootbuild "${makepkg_args[@]}"
 then
-	move_products
+	move_products "$copydir" "$src_owner"
 else
 	(( ret += 1 ))
 fi
 
-$temp_chroot && clean_temporary
+$temp_chroot && delete_chroot "$copydir"
 
 if (( ret != 0 )); then
 	if $temp_chroot; then
@@ -466,3 +575,4 @@ if (( ret != 0 )); then
 else
 	true
 fi
+}
