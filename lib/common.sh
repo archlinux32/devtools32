@@ -1,3 +1,5 @@
+# License: Unspecified
+
 # Avoid any encoding problems
 export LANG=C
 
