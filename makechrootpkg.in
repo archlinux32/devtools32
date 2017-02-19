@@ -348,6 +348,7 @@ EOF
 # Usage: download_sources $copydir $src_owner
 # Globals:
 #  - SRCDEST
+#  - USER
 download_sources() {
 	local copydir=$1
 	local src_owner=$2
@@ -487,9 +488,6 @@ main() {
 	[[ ! -d $chrootdir ]] && die "No chroot dir defined, or invalid path '%s'" "$passeddir"
 	[[ ! -d $chrootdir/root ]] && die "Missing chroot dir root directory. Try using: mkarchroot %s/root base-devel" "$chrootdir"
 
-	# Detect chrootdir filesystem type
-	chroottype=$(stat -f -c %T "$chrootdir")
-
 	if [[ ${copy:0:1} = / ]]; then
 		copydir=$copy
 	else
@@ -541,7 +539,7 @@ main() {
 		install_packages "$copydir" "${install_pkgs[@]}"
 		ret=$?
 		# If there is no PKGBUILD we have done
-		[[ -f PKGBUILD ]] || exit $ret
+		[[ -f PKGBUILD ]] || return $ret
 	fi
 
 	download_sources "$copydir" "$src_owner"
