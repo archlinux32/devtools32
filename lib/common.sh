@@ -6,9 +6,7 @@
 
 # License: Unspecified
 
-shopt -s extglob
-
-if [[ -z ${_INCLUDE_COMMON_SH:-} ]]; then
+[[ -z ${_INCLUDE_COMMON_SH:-} ]] || return 0
 _INCLUDE_COMMON_SH=true
 
 [[ -n ${TEXTDOMAIN:-}    ]] || export TEXTDOMAIN='libretools'
@@ -295,5 +293,3 @@ check_root() {
 		exec su root -c "$(printf ' %q' "$@")"
 	fi
 }
-
-fi
