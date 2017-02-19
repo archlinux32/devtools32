@@ -161,8 +161,7 @@ get_full_version() {
 ##
 #  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-lock()
-{
+lock() {
 	local fd=$1
 	local file=$2
 	local mesg=("${@:3}")
@@ -183,8 +182,7 @@ lock()
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-slock()
-{
+slock() {
 	local fd=$1
 	local file=$2
 	local mesg=("${@:3}")
