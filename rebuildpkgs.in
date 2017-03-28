@@ -40,7 +40,7 @@ bump_pkgrel() {
 	oldrel=$(grep 'pkgrel=' $pbuild | cut -d= -f2)
 
 	#remove decimals
-	rel=$(echo $oldrel | cut -d. -f1)
+	rel=${oldrel%%.*}
 
 	newrel=$((rel + 1))
 
@@ -50,11 +50,12 @@ bump_pkgrel() {
 pkg_from_pkgbuild() {
 	# we want the sourcing to be done in a subshell so we don't pollute our current namespace
 	export CARCH PKGEXT
+	# shellcheck source=/dev/null
 	(source PKGBUILD; echo "$pkgname-$pkgver-$pkgrel-$CARCH$PKGEXT")
 }
 
 chrootdir="$1"; shift
-pkgs="$@"
+pkgs=("$@")
 
 SVNPATH='svn+ssh://repos.archlinux.org/srv/repos/svn-packages/svn'
 
@@ -67,7 +68,7 @@ cd "$REBUILD_ROOT"
 /usr/bin/svn co -N $SVNPATH
 
 FAILED=""
-for pkg in $pkgs; do
+for pkg in "${pkgs[@]}"; do
 	cd "$REBUILD_ROOT/svn-packages"
 
 	msg2 "Building '%s'" "$pkg"
