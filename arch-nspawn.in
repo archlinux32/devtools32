@@ -59,9 +59,9 @@ else
 fi
 
 if [[ -n $makepkg_conf ]]; then
-	eval $(grep '^CARCH=' "$makepkg_conf")
+	eval "$(grep '^CARCH=' "$makepkg_conf")"
 else
-	eval $(grep '^CARCH=' "$working_dir/etc/makepkg.conf")
+	eval "$(grep '^CARCH=' "$working_dir/etc/makepkg.conf")"
 fi
 
 if [[ "$CARCH" = 'i'*'86' ]]; then
@@ -90,7 +90,7 @@ build_mount_args() {
 
 	mount_args+=("--bind=${cache_dirs[0]}")
 
-	for cache_dir in ${cache_dirs[@]:1}; do
+	for cache_dir in "${cache_dirs[@]:1}"; do
 		mount_args+=("--bind-ro=$cache_dir")
 	done
 }
@@ -101,8 +101,8 @@ copy_hostconf () {
 		tee "$working_dir/etc/pacman.d/mirrorlist" > \
 		"$working_dir/etc/pacman.d/mirrorlist32"
 
-	[[ -n $pac_conf ]] && cp $pac_conf "$working_dir/etc/pacman.conf"
-	[[ -n $makepkg_conf ]] && cp $makepkg_conf "$working_dir/etc/makepkg.conf"
+	[[ -n $pac_conf ]] && cp "$pac_conf" "$working_dir/etc/pacman.conf"
+	[[ -n $makepkg_conf ]] && cp "$makepkg_conf" "$working_dir/etc/makepkg.conf"
 
 	local file
 	for file in "${files[@]}"; do
@@ -110,7 +110,7 @@ copy_hostconf () {
 		cp -T "$file" "$working_dir$file"
 	done
 
-	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n ${cache_dirs[@]})|g" -i "$working_dir/etc/pacman.conf"
+	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n "${cache_dirs[@]}")|g" -i "$working_dir/etc/pacman.conf"
 	sed -i '/^Architecture = /s| auto$| '"$CARCH|" "$working_dir/etc/pacman.conf"
 }
 # }}}
@@ -120,7 +120,7 @@ umask 0022
 # Sanity check
 if [[ ! -f "$working_dir/.arch-chroot" ]]; then
 	die "'%s' does not appear to be an Arch chroot." "$working_dir"
-elif [[ $(cat "$working_dir/.arch-chroot") != $CHROOT_VERSION ]]; then
+elif [[ $(cat "$working_dir/.arch-chroot") != "$CHROOT_VERSION" ]]; then
 	die "chroot '%s' is not at version %s. Please rebuild." "$working_dir" "$CHROOT_VERSION"
 fi
 
