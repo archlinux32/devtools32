@@ -224,3 +224,60 @@ find_cached_package() {
 			return 1
 	esac
 }
+
+##
+#  usage: find_cached_srcpackage( $pkgname, $pkgver, $arch )
+#
+#    $pkgver can be supplied with or without a pkgrel appended.
+#    If not supplied, any pkgrel will be matched.
+##
+find_cached_srcpackage() {
+	local searchdirs=("$PWD" "$SRCPKGDEST") results=()
+	local targetname=$1 targetver=$2 targetarch=$3
+	local dir pkg pkgbasename name ver rel arch r results
+
+	for dir in "${searchdirs[@]}"; do
+		[[ -d $dir ]] || continue
+
+		for pkg in "$dir"/*.src.tar?(.?z); do
+			[[ -f $pkg ]] || continue
+
+			# avoid adding duplicates of the same inode
+			for r in "${results[@]}"; do
+				[[ $r -ef $pkg ]] && continue 2
+			done
+
+			# split apart package filename into parts
+			pkgbasename=${pkg##*/}
+			pkgbasename=${pkgbasename%.src.tar?(.?z)}
+
+			arch=${pkgbasename##*-}
+			pkgbasename=${pkgbasename%-"$arch"}
+
+			rel=${pkgbasename##*-}
+			pkgbasename=${pkgbasename%-"$rel"}
+
+			ver=${pkgbasename##*-}
+			name=${pkgbasename%-"$ver"}
+
+			if [[ $targetname = "$name" && $targetarch = "$arch" ]] &&
+					pkgver_equal "$targetver" "$ver-$rel"; then
+				results+=("$pkg")
+			fi
+		done
+	done
+
+	case ${#results[*]} in
+		0)
+			return 1
+			;;
+		1)
+			printf '%s\n' "${results[0]}"
+			return 0
+			;;
+		*)
+			_l error 'Multiple packages found:'
+			printf '\t%s\n' "${results[@]}" >&2
+			return 1
+	esac
+}
