@@ -71,7 +71,7 @@ else
 		-C "@pkgdatadir@/pacman-${repo}.conf" \
 		-M "@pkgdatadir@/makepkg-${arch}.conf" \
 		"${chroots}/${repo}-${arch}/root" \
-                pacman --arch ${arch} -Syu --noconfirm || abort
+		pacman --arch ${arch} -Syu --noconfirm || abort
 fi
 
 msg "Building in chroot for [%s] (%s)..." "${repo}" "${arch}"
