@@ -41,16 +41,16 @@ done
 
 check_root
 
-# Pass all arguments after -- right to makepkg
-makechrootpkg_args+=("${@:$OPTIND}")
-
 if [ "${arch}" = "x86_64" ]; then
 	cache_dir=''
 else
 	mkdir -p '/var/cache/archbuild32'
-	cache_dir='-c /var/cache/archbuild32'
-	makechrootpkg_args+=('-d /var/cache/archbuild32')
+	cache_dir='-c/var/cache/archbuild32'
+	makechrootpkg_args+=('-d/var/cache/archbuild32')
 fi
+
+# Pass all arguments after -- right to makepkg
+makechrootpkg_args+=("${@:$OPTIND}")
 
 if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 	msg "Creating chroot for [%s] (%s)..." "${repo}" "${arch}"
