@@ -24,6 +24,7 @@ CONFIGFILES = \
 	pacman-extra.conf \
 	pacman-testing.conf \
 	pacman-staging.conf \
+	pacman-staging-i686.conf \
 	pacman-multilib.conf \
 	pacman-multilib-testing.conf \
 	pacman-multilib-staging.conf \
