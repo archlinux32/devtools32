@@ -58,9 +58,28 @@ else
 	cache_dirs=("$cache_dir")
 fi
 
+if [[ -n $makepkg_conf ]]; then
+	eval "$(grep -a '^CARCH=' "$makepkg_conf")"
+else
+	eval "$(grep -a '^CARCH=' "$working_dir/etc/makepkg.conf")"
+fi
+
+if [[ "$CARCH" = 'i'*'86' ]]; then
+	host_mirror="$(
+		sed -n '
+			/^\s*Server\s*=/{
+				s/^.*=\s*//
+				s/\s*\(#.*\)\?$//
+				p
+				q
+			}' \
+			'/etc/pacman.d/mirrorlist32'
+	)"
+else
 # shellcheck disable=2016
-host_mirror=$(pacman --cachedir /doesnt/exist -Sddp extra/devtools 2>/dev/null | sed -r 's#(.*/)extra/os/.*#\1$repo/os/$arch#;s#(.*/)[^/]+/extra/[^/]+#\1$arch/$repo#')
+	host_mirror=$(pacman --cachedir /doesnt/exist -Sddp extra/devtools 2>/dev/null | sed -r 's#(.*/)extra/os/.*#\1$repo/os/$arch#;s#(.*/)[^/]+/extra/[^/]+#\1$arch/$repo#')
 # shellcheck disable=2016
+fi
 [[ $host_mirror == *file://* ]] && host_mirror_path=$(echo "$host_mirror" | sed -r 's#file://(/.*)/\$repo/os/\$arch#\1#g')
 
 # {{{ functions
@@ -80,7 +99,9 @@ build_mount_args() {
 
 copy_hostconf () {
 	cp -a /etc/pacman.d/gnupg "$working_dir/etc/pacman.d"
-	echo "Server = $host_mirror" >"$working_dir/etc/pacman.d/mirrorlist"
+	echo "Server = $host_mirror" | \
+		tee "$working_dir/etc/pacman.d/mirrorlist" > \
+		"$working_dir/etc/pacman.d/mirrorlist32"
 
 	[[ -n $pac_conf ]] && cp "$pac_conf" "$working_dir/etc/pacman.conf"
 	[[ -n $makepkg_conf ]] && cp "$makepkg_conf" "$working_dir/etc/makepkg.conf"
@@ -92,7 +113,6 @@ copy_hostconf () {
 	done
 
 	sed -r "s|^#?\\s*CacheDir.+|CacheDir = ${cache_dirs[*]}|g" -i "$working_dir/etc/pacman.conf"
-	eval "$(grep -a '^CARCH=' "$working_dir/etc/makepkg.conf")"
 	sed -i '/^Architecture = /s| auto$| '"$CARCH|" "$working_dir/etc/pacman.conf"
 }
 # }}}
