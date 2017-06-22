@@ -11,11 +11,17 @@ cmd="${0##*/}"
 if [[ "${cmd%%-*}" == 'multilib' ]]; then
 	repo="${cmd%-build}"
 	arch='x86_64'
+	arch_ext=''
 	base_packages+=(multilib-devel)
 else
 	tag="${cmd%-build}"
 	repo=${tag%-*}
 	arch=${tag##*-}
+	if [ "${arch}" = 'x86_64' ]; then
+		arch_ext=''
+	else
+		arch_ext="-${arch}"
+	fi
 fi
 chroots='/var/lib/archbuild'
 clean_first=false
@@ -69,7 +75,7 @@ if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 	rm -rf --one-file-system "${chroots}/${repo}-${arch}"
 	mkdir -p "${chroots}/${repo}-${arch}"
 	setarch "${arch}" mkarchroot \
-		-C "@pkgdatadir@/pacman-${repo}.conf" \
+		-C "@pkgdatadir@/pacman-${repo}${arch_ext}.conf" \
 		-M "@pkgdatadir@/makepkg-${arch}.conf" \
 		${cache_dir} \
 		"${chroots}/${repo}-${arch}/root" \
@@ -77,7 +83,7 @@ if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 else
 	lock 9 "${chroots}/${repo}-${arch}/root.lock" "Locking clean chroot"
 	arch-nspawn \
-		-C "@pkgdatadir@/pacman-${repo}.conf" \
+		-C "@pkgdatadir@/pacman-${repo}${arch_ext}.conf" \
 		-M "@pkgdatadir@/makepkg-${arch}.conf" \
 		${cache_dir} \
 		"${chroots}/${repo}-${arch}/root" \
