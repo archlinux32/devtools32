@@ -182,6 +182,7 @@ prepare_chroot() {
 	printf >>"$copydir/etc/shadow" 'builduser:!!:%d::::::\n' "$(( $(date -u +%s) / 86400 ))"
 
 	$install -d "$copydir"/{build,startdir,{pkg,srcpkg,src,log}dest}
+	echo 'keyserver-options auto-key-retrieve' >> "$copydir/build/.gnupg/gpg.conf"
 
 	sed -e '/^MAKEFLAGS=/d' -e '/^PACKAGER=/d' -i "$copydir/etc/makepkg.conf"
 	for x in BUILDDIR=/build PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest SRCDEST=/srcdest LOGDEST=/logdest \
