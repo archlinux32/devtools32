@@ -17,7 +17,11 @@ else
 	tag="${cmd%-build}"
 	repo=${tag%-*}
 	arch=${tag##*-}
-	arch_ext="-${arch}"
+	if [ "${arch}" = 'x86_64' ]; then
+		arch_ext=''
+	else
+		arch_ext="-${arch}"
+	fi
 fi
 chroots='/var/lib/archbuild'
 clean_first=false
