@@ -66,8 +66,10 @@ if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 		subvolume_delete_recursive "${copy}"
 		rm -rf --one-file-system "${copy}"
 		if [ -d "${copy}" ]; then
-			find "${copy}" -xdev -type d -exec 'mountpoint' '{}' ';' | \
-				xargs -rn1 umount -l
+			find "${copy}" \
+				-xdev -mindepth 1 -type d \
+				-exec 'mountpoint' '-q' '{}' ';' \
+				-exec 'umount' '-l' '{}' ';'
 			rm -rf --one-file-system "${copy}"
 		fi
 	done
