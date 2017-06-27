@@ -186,6 +186,7 @@ prepare_chroot() {
 		[[ -r $USER_HOME/$x ]] || continue
 		$install -m 644 "$USER_HOME/$x" "$copydir/build/$x"
 	done
+	echo 'keyserver-options auto-key-retrieve' >> "$copydir/build/.gnupg/gpg.conf"
 
 	sed -e '/^MAKEFLAGS=/d' -e '/^PACKAGER=/d' -i "$copydir/etc/makepkg.conf"
 	for x in BUILDDIR=/build PKGDEST=/pkgdest SRCPKGDEST=/srcpkgdest SRCDEST=/srcdest LOGDEST=/logdest \
