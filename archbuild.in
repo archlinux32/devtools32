@@ -52,7 +52,7 @@ if [ "${arch}" = "x86_64" ]; then
 else
 	mkdir -p '/var/cache/archbuild32'
 	cache_dir='-c/var/cache/archbuild32'
-	makechrootpkg_args+=('-d/var/cache/archbuild32')
+	makechrootpkg_args+=('-d/var/cache/archbuild32:/var/cache/pacman/pkg')
 fi
 
 # Pass all arguments after -- right to makepkg
