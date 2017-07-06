@@ -75,6 +75,9 @@ if ${clean_first} || [[ ! -d "${chroots}/${repo}-${arch}" ]]; then
 				-exec 'mountpoint' '-q' '{}' ';' \
 				-exec 'umount' '-l' '{}' ';'
 			rm -rf --one-file-system "${copy}"
+			mountpoint -q "${copy}" && \
+				umount -l "${copy}" && \
+				rmdir "${copy}"
 		fi
 	done
 	lock_close 9
