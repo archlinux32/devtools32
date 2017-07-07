@@ -25,6 +25,7 @@ CONFIGFILES = \
 	pacman-testing.conf \
 	pacman-staging.conf \
 	pacman-staging-i686.conf \
+	pacman-staging-with-build-support-i686.conf \
 	pacman-multilib.conf \
 	pacman-multilib-testing.conf \
 	pacman-multilib-staging.conf \
@@ -51,6 +52,7 @@ ARCHBUILD_LINKS = \
 	testing-i686-build \
 	testing-x86_64-build \
 	staging-i686-build \
+	staging-with-build-support-i686-build \
 	staging-x86_64-build \
 	multilib-build \
 	multilib-testing-build \
