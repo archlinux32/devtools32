@@ -267,17 +267,12 @@ download_sources() {
 	local copydir=$1
 	local makepkg_user=$2
 
-	local builddir
-	builddir="$(mktemp -d)"
-	chmod 1777 "$builddir"
+	setup_workdir
 
 	# Ensure sources are downloaded
-	sudo -u "$makepkg_user" env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
+	sudo -u "$makepkg_user" env SRCDEST="$SRCDEST" BUILDDIR="$WORKDIR" \
 		makepkg --config="$copydir/etc/makepkg.conf" --verifysource -o ||
 		die "Could not download sources."
-
-	# Clean up garbage from verifysource
-	rm -rf "$builddir"
 }
 
 # Usage: move_products $copydir $owner
