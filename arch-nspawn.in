@@ -133,6 +133,6 @@ copy_hostconf
 
 exec ${CARCH:+setarch "$CARCH"} systemd-nspawn -q \
 	-D "$working_dir" \
-	--register=no \
+	--register=no --keep-unit \
 	"${mount_args[@]}" \
 	"$@"
