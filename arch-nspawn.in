@@ -117,6 +117,7 @@ esac
 
 exec ${CARCH:+setarch "$CARCH"} systemd-nspawn -q \
 	-D "$working_dir" \
-	--register=no \
+	-E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
+	--register=no --keep-unit \
 	"${mount_args[@]}" \
 	"$@"
