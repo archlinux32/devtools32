@@ -235,7 +235,10 @@ _chrootbuild() {
 
 _chrootnamcap() {
 	pacman -S --needed --noconfirm namcap
-	for pkgfile in /startdir/PKGBUILD /pkgdest/*; do
+	for pkgfile in /startdir/PKGBUILD /startdir/*.pkg.tar.xz /pkgdest/*; do
+		if [ ! -f "${pkgfile}" ]; then
+			continue
+		fi
 		echo "Checking ${pkgfile##*/}"
 		sudo -u builduser namcap "$pkgfile" 2>&1 | tee "/logdest/${pkgfile##*/}-namcap.log"
 	done
