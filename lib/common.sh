@@ -112,7 +112,8 @@ die() {
 ##
 #  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-lock() {
+lock() # newline here to avoid confusing xgettext
+{
 	# Only reopen the FD if it wasn't handed to us
 	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
 		mkdir -p -- "$(dirname -- "$2")"
@@ -129,7 +130,8 @@ lock() {
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
-slock() {
+slock() # newline here to avoid confusing xgettext
+{
 	# Only reopen the FD if it wasn't handed to us
 	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
 		mkdir -p -- "$(dirname -- "$2")"
