@@ -15,29 +15,6 @@ m4_include(lib/archroot.sh)
 
 shopt -s nullglob
 
-init_variables() {
-	default_makepkg_args=(--syncdeps --noconfirm --log --holdver --skipinteg)
-	makepkg_args=("${default_makepkg_args[@]}")
-	keepbuilddir=false
-	update_first=false
-	clean_first=false
-	run_namcap=false
-	temp_chroot=false
-	chrootdir=
-	passeddir=
-	makepkg_user=
-	declare -ga install_pkgs
-	declare -gi ret=0
-
-	bindmounts_ro=()
-	bindmounts_rw=()
-
-	copy=$USER
-	[[ -n ${SUDO_USER:-} ]] && copy=$SUDO_USER
-	[[ -z "$copy" || $copy = root ]] && copy=copy
-	src_owner=${SUDO_USER:-$USER}
-}
-
 usage() {
 	echo "Usage: ${0##*/} [options] -r <chrootdir> [--] [makepkg args]"
 	echo ' Run this script in a PKGBUILD dir to build a package inside a'
@@ -247,6 +224,7 @@ Server = file:///repo
 	{
 		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
+		declare -p SOURCE_DATE_EPOCH 2>/dev/null
 		printf '_chrootbuild "$@" || exit\n'
 
 		if $run_namcap; then
@@ -260,18 +238,26 @@ Server = file:///repo
 # These functions aren't run in makechrootpkg,
 # so no global variables
 _chrootprepare() {
+	# No coredumps
+	ulimit -c 0
+
 	# shellcheck source=/dev/null
 	. /etc/profile
+
 	# Beware, there are some stupid arbitrary rules on how you can
 	# use "$" in arguments to commands with "sudo -i".  ${foo} or
 	# ${1} is OK, but $foo or $1 isn't.
 	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
-	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@" --nobuild' -bash "$@"
+	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@" --nobuild' -bash "$@"
 }
 
 _chrootbuild() {
+	# No coredumps
+	ulimit -c 0
+
 	# shellcheck source=/dev/null
 	. /etc/profile
+
 	local srcext
 	srcext="$(
 		# shellcheck source=makepkg-x86_64.conf
@@ -285,12 +271,13 @@ _chrootbuild() {
 		fi
 		printf '%s\n' "-$pkgarch$SRCEXT"
 	)" || return
+
 	# Beware, there are some stupid arbitrary rules on how you can
 	# use "$" in arguments to commands with "sudo -i".  ${foo} or
 	# ${1} is OK, but $foo or $1 isn't.
 	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
-	sudo -iu builduser bash -c 'cd /startdir; SRCEXT="${1}" makepkg "${@:2}" --allsource' -bash "$srcext" "$@" || return
-	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@" --noextract --noprepare' -bash "$@"
+	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; SRCEXT="${1}" makepkg "${@:2}" --allsource' -bash "$srcext" "$@" || return
+	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@" --noextract --noprepare' -bash "$@"
 }
 
 _chrootnamcap() {
@@ -304,7 +291,6 @@ _chrootnamcap() {
 # Usage: download_sources $copydir $makepkg_user
 # Globals:
 #  - SRCDEST
-#  - USER
 download_sources() {
 	local copydir=$1
 	local makepkg_user=$2
@@ -326,6 +312,7 @@ download_sources() {
 # Globals:
 #  - PKGDEST
 #  - LOGDEST
+#  - SRCPKGDEST
 move_products() {
 	local copydir=$1
 	local src_owner=$2
@@ -361,7 +348,26 @@ move_products() {
 # }}}
 
 main() {
-	init_variables
+	default_makepkg_args=(--syncdeps --noconfirm --log --holdver --skipinteg)
+	makepkg_args=("${default_makepkg_args[@]}")
+	keepbuilddir=false
+	update_first=false
+	clean_first=false
+	run_namcap=false
+	temp_chroot=false
+	chrootdir=
+	passeddir=
+	makepkg_user=
+	declare -a install_pkgs
+	declare -i ret=0
+
+	bindmounts_ro=()
+	bindmounts_rw=()
+
+	copy=$USER
+	[[ -n ${SUDO_USER:-} ]] && copy=$SUDO_USER
+	[[ -z "$copy" || $copy = root ]] && copy=copy
+	src_owner=${SUDO_USER:-$USER}
 
 	while getopts 'hcur:I:l:nTD:d:U:' arg; do
 		case "$arg" in
@@ -383,7 +389,7 @@ main() {
 	[[ -n $makepkg_user && -z $(id -u "$makepkg_user") ]] && die 'Invalid makepkg user.'
 	makepkg_user=${makepkg_user:-${SUDO_USER:-$USER}}
 
-	check_root
+	check_root SOURCE_DATE_EPOCH
 
 	# Canonicalize chrootdir, getting rid of trailing /
 	chrootdir=$(readlink -e "$passeddir")
