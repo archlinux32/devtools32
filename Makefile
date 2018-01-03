@@ -19,6 +19,7 @@ BINPROGS = \
 	makechrootpkg
 
 CONFIGFILES = \
+	makepkg-i686.conf \
 	makepkg-x86_64.conf \
 	pacman-extra.conf \
 	pacman-testing.conf \
@@ -43,13 +44,18 @@ COMMITPKG_LINKS = \
 	gnome-unstablepkg
 
 ARCHBUILD_LINKS = \
+	extra-i686-build \
 	extra-x86_64-build \
+	testing-i686-build \
 	testing-x86_64-build \
+	staging-i686-build \
 	staging-x86_64-build \
 	multilib-build \
 	multilib-testing-build \
 	multilib-staging-build \
+	kde-unstable-i686-build \
 	kde-unstable-x86_64-build \
+	gnome-unstable-i686-build \
 	gnome-unstable-x86_64-build
 
 CROSSREPOMOVE_LINKS = \
