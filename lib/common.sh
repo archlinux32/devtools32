@@ -7,10 +7,12 @@
 # License: Unspecified
 
 [[ -z ${_INCLUDE_COMMON_SH:-} ]] || return 0
-_INCLUDE_COMMON_SH=true
+_INCLUDE_COMMON_SH="$(set +o|grep nounset)"
 
+set +u +o posix
 # shellcheck disable=1091
 . /usr/share/makepkg/util.sh
+$_INCLUDE_COMMON_SH
 
 [[ -n ${TEXTDOMAIN:-}    ]] || export TEXTDOMAIN='libretools'
 [[ -n ${TEXTDOMAINDIR:-} ]] || export TEXTDOMAINDIR='/usr/share/locale'
