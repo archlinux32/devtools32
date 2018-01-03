@@ -27,6 +27,10 @@ _l() {
 	TEXTDOMAIN='librelib' TEXTDOMAINDIR='/usr/share/locale' "$@"
 }
 
+_p() {
+	TEXTDOMAIN='pacman-scripts' TEXTDOMAINDIR='/usr/share/locale' "$@"
+}
+
 shopt -s extglob
 
 # check if messages are to be printed using color
@@ -36,6 +40,27 @@ else
 	# shellcheck disable=2034
 	declare -gr ALL_OFF='' BOLD='' BLUE='' GREEN='' RED='' YELLOW=''
 fi
+
+# makepkg message functions expect gettext to already be called; like
+# `msg "$(gettext 'Hello World')"`.  Where libretools expects the
+# message functions to call gettext.  So, we'll do some magic to wrap
+# the makepkg versions.
+eval "$(
+	fns=(
+		plain
+		msg
+		msg2
+		warning
+		error
+	)
+
+	# declare _makepkg_${fn} as a copy of ${fn}
+	declare -f "${fns[@]}" | sed 's/^[a-z]/_makepkg_&/'
+
+	# re-declare ${fn} as a wrapper around _makepkg_${fn}
+	printf '%s() { local mesg; mesg="$(_ "$1")"; _p _makepkg_"${FUNCNAME[0]}" "$mesg" "${@:2}"; }\n' \
+	       "${fns[@]}"
+)"
 
 stat_busy() {
 	local mesg; mesg="$(_ "$1")"; shift
