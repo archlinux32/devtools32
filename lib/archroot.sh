@@ -6,15 +6,13 @@
 CHROOT_VERSION='v4'
 
 ##
-#  usage : check_root $keepenv
+#  usage : check_root
 ##
 orig_argv=("$0" "$@")
 check_root() {
-	local keepenv=$1
-
 	(( EUID == 0 )) && return
 	if type -P sudo >/dev/null; then
-		exec sudo --preserve-env=$keepenv -- "${orig_argv[@]}"
+		exec sudo -- "${orig_argv[@]}"
 	else
 		exec su root -c "$(printf ' %q' "${orig_argv[@]}")"
 	fi
