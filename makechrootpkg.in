@@ -202,7 +202,6 @@ EOF
 	{
 		printf '#!/bin/bash\n'
 		declare -f _chrootbuild
-		declare -p SOURCE_DATE_EPOCH 2>/dev/null || true
 		printf '_chrootbuild "$@" || exit\n'
 
 		if [[ $run_namcap = true ]]; then
@@ -229,7 +228,7 @@ _chrootbuild() {
 	# use "$" in arguments to commands with "sudo -i".  ${foo} or
 	# ${1} is OK, but $foo or $1 isn't.
 	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
-	sudo --preserve-env=SOURCE_DATE_EPOCH -iu builduser bash -c 'cd /startdir; makepkg "$@"' -bash "$@"
+	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@"' -bash "$@"
 }
 
 _chrootnamcap() {
@@ -341,7 +340,7 @@ main() {
 	[[ -n $makepkg_user && -z $(id -u "$makepkg_user") ]] && die 'Invalid makepkg user.'
 	makepkg_user=${makepkg_user:-${SUDO_USER:-$USER}}
 
-	check_root SOURCE_DATE_EPOCH,GNUPGHOME
+	check_root
 
 	# Canonicalize chrootdir, getting rid of trailing /
 	chrootdir=$(readlink -e "$passeddir")
